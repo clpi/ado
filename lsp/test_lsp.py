@@ -103,10 +103,14 @@ fn main() {
         'textDocument': {'uri': 'file:///test.do'},
         'position': {'line': 5, 'character': 10}
     }, req_id=2)
+    timeout_counter = 0
     while True:
         response = read_response(proc)
         if 'id' in response:
             break
+        timeout_counter += 1
+        if timeout_counter > 10:
+            raise TimeoutError("No response with 'id' received after 10 attempts")
     assert 'result' in response
     assert 'items' in response['result']
     items = [item['label'] for item in response['result']['items']]
