@@ -144,10 +144,14 @@ fn main() {
         'position': {'line': 0, 'character': 3},  # 'add' function name
         'context': {'includeDeclaration': True}
     }, req_id=4)
+    timeout_counter = 0
     while True:
         response = read_response(proc)
         if 'id' in response:
             break
+        timeout_counter += 1
+        if timeout_counter > 10:
+            raise TimeoutError("No response with 'id' received after 10 attempts")
     if response.get('result'):
         print(f"   ✓ Found {len(response['result'])} references")
     
