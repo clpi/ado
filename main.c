@@ -25,7 +25,10 @@ int run_process(const char *program, char *const argv[], int quiet_stderr) {
     if (pid < 0) return -1;
     if (pid == 0) {
         if (quiet_stderr) {
-            if (freopen("/dev/null", "w", stderr) == NULL) _exit(1);
+            if (freopen("/dev/null", "w", stderr) == NULL) {
+                close(STDERR_FILENO);
+                _exit(1);
+            }
         }
         execvp(program, argv);
         _exit(127);
@@ -37,12 +40,12 @@ int run_process(const char *program, char *const argv[], int quiet_stderr) {
     return -1;
 }
 
-int compile_and_run(const char *src_path, const char *bin_path, int quiet_compile_stderr) {
-    char *compile_argv[] = {"cc", "-O2", "-o", (char *)bin_path, (char *)src_path, NULL};
+int compile_and_run(char *src_path, char *bin_path, int quiet_compile_stderr) {
+    char *compile_argv[] = {"cc", "-O2", "-o", bin_path, src_path, NULL};
     int compile_ret = run_process("cc", compile_argv, quiet_compile_stderr);
     if (compile_ret != 0) return compile_ret;
 
-    char *run_argv[] = {(char *)bin_path, NULL};
+    char *run_argv[] = {bin_path, NULL};
     return run_process(bin_path, run_argv, 0);
 }
 
