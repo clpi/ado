@@ -52,6 +52,7 @@ void test_parse_program_fn() {
     assert(prog->type == AST_BLOCK);
     assert(prog->block.count == 1);
 
+    assert(prog->block.stmts != NULL);
     AST *fn = prog->block.stmts[0];
     assert(fn->type == AST_FN);
     assert(strcmp(fn->fn.name, "add") == 0);
