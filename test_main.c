@@ -55,8 +55,9 @@ void test_compile_and_run_compile_failure() {
 
     assert(unlink("test_bad_compile.c") == 0);
     int unlink_bin_rc = unlink("test_bad_compile_bin");
-    int unlink_bin_errno = errno;
-    assert(unlink_bin_rc == 0 || unlink_bin_errno == ENOENT);
+    if (unlink_bin_rc == -1 && errno != ENOENT) {
+        assert(0);
+    }
 }
 
 void test_compile_and_run_missing_compiler() {
@@ -81,8 +82,9 @@ void test_compile_and_run_missing_compiler() {
 
     assert(unlink("test_missing_cc.c") == 0);
     int unlink_bin_rc = unlink("test_missing_cc_bin");
-    int unlink_bin_errno = errno;
-    assert(unlink_bin_rc == 0 || unlink_bin_errno == ENOENT);
+    if (unlink_bin_rc == -1 && errno != ENOENT) {
+        assert(0);
+    }
 }
 
 int main() {
