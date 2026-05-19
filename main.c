@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include "lexer.h"
@@ -80,9 +81,12 @@ int compile_and_run(const char *out_bin, const char *out_c, int silent) {
                 perror("fork");
                 return -1;
             } else if (run_pid == 0) {
-                size_t dot_slash_len = strlen(out_bin) + 3;
-                char dot_slash_bin[dot_slash_len];
-                snprintf(dot_slash_bin, dot_slash_len, "./%s", out_bin);
+                char dot_slash_bin[PATH_MAX];
+                int n = snprintf(dot_slash_bin, sizeof(dot_slash_bin), "./%s", out_bin);
+                if (n < 0 || (size_t)n >= sizeof(dot_slash_bin)) {
+                    fprintf(stderr, "Output binary path too long\n");
+                    _exit(1);
+                }
                 execlp(dot_slash_bin, out_bin, NULL);
                 perror("execlp run");
                 _exit(1);
