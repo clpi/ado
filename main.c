@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include "lexer.h"
 #include "parser.h"
 #include "codegen.h"
@@ -19,8 +20,30 @@ char *read_file(char *path) {
     return buf;
 }
 
-int is_safe_shell_path(const char *path) {
-    return strchr(path, '\'') == NULL && strchr(path, '\n') == NULL && strchr(path, '\r') == NULL;
+int run_process(const char *program, char *const argv[], int quiet_stderr) {
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+    if (pid == 0) {
+        if (quiet_stderr) {
+            if (!freopen("/dev/null", "w", stderr)) _exit(127);
+        }
+        execvp(program, argv);
+        _exit(127);
+    }
+
+    int status;
+    if (waitpid(pid, &status, 0) < 0) return -1;
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    return -1;
+}
+
+int compile_and_run(const char *src_path, const char *bin_path, int quiet_compile_stderr) {
+    char *compile_argv[] = {"cc", "-O2", "-o", (char *)bin_path, (char *)src_path, NULL};
+    int compile_ret = run_process("cc", compile_argv, quiet_compile_stderr);
+    if (compile_ret != 0) return compile_ret;
+
+    char *run_argv[] = {(char *)bin_path, NULL};
+    return run_process(bin_path, run_argv, 0);
 }
 
 void repl(void) {
@@ -104,15 +127,6 @@ void repl(void) {
             char bin_path[256];
             snprintf(src_path, sizeof(src_path), "%s/out.c", tmp_dir);
             snprintf(bin_path, sizeof(bin_path), "%s/out", tmp_dir);
-            if (!is_safe_shell_path(src_path) || !is_safe_shell_path(bin_path)) {
-                fprintf(stderr, "Error: Unsafe temporary path\n");
-                rmdir(tmp_dir);
-                ast_free(ast);
-                free(p);
-                lexer_free(lex);
-                free(src);
-                continue;
-            }
 
             FILE *out = fopen(src_path, "w");
             if (!out) {
@@ -127,9 +141,7 @@ void repl(void) {
             codegen(ast, out);
             fclose(out);
             
-            char cmd[1024];
-            snprintf(cmd, sizeof(cmd), "cc -O2 -o '%s' '%s' 2>/dev/null && '%s'", bin_path, src_path, bin_path);
-            int ret = system(cmd);
+            int ret = compile_and_run(src_path, bin_path, 1);
             if (ret != 0) {
                 printf("Error compiling or running code\n");
             }
@@ -180,15 +192,6 @@ int main(int argc, char **argv) {
         char bin_path[256];
         snprintf(src_path, sizeof(src_path), "%s/out.c", tmp_dir);
         snprintf(bin_path, sizeof(bin_path), "%s/out", tmp_dir);
-        if (!is_safe_shell_path(src_path) || !is_safe_shell_path(bin_path)) {
-            fprintf(stderr, "Error: Unsafe temporary path\n");
-            rmdir(tmp_dir);
-            ast_free(ast);
-            free(p);
-            lexer_free(lex);
-            free(src);
-            return 1;
-        }
 
         FILE *out = fopen(src_path, "w");
         if (!out) {
@@ -203,9 +206,7 @@ int main(int argc, char **argv) {
         codegen(ast, out);
         fclose(out);
         
-        char cmd[1024];
-        snprintf(cmd, sizeof(cmd), "cc -O2 -o '%s' '%s' && '%s'", bin_path, src_path, bin_path);
-        int ret = system(cmd);
+        int ret = compile_and_run(src_path, bin_path, 0);
         (void)ret;
         
         ast_free(ast);
@@ -245,15 +246,6 @@ int main(int argc, char **argv) {
     char bin_path[256];
     snprintf(src_path, sizeof(src_path), "%s/out.c", tmp_dir);
     snprintf(bin_path, sizeof(bin_path), "%s/out", tmp_dir);
-    if (!is_safe_shell_path(src_path) || !is_safe_shell_path(bin_path)) {
-        fprintf(stderr, "Error: Unsafe temporary path\n");
-        rmdir(tmp_dir);
-        ast_free(ast);
-        free(p);
-        lexer_free(lex);
-        free(src);
-        return 1;
-    }
 
     FILE *out = fopen(src_path, "w");
     if (!out) {
@@ -268,13 +260,10 @@ int main(int argc, char **argv) {
     codegen(ast, out);
     fclose(out);
     
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "cc -O2 -o '%s' '%s' 2>/dev/null && '%s'", bin_path, src_path, bin_path);
-    int ret = system(cmd);
+    int ret = compile_and_run(src_path, bin_path, 1);
     if (ret != 0) {
         // Try with more verbose error output
-        snprintf(cmd, sizeof(cmd), "cc -O2 -o '%s' '%s' && '%s'", bin_path, src_path, bin_path);
-        ret = system(cmd);
+        ret = compile_and_run(src_path, bin_path, 0);
     }
     
     ast_free(ast);

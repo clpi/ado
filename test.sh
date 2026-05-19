@@ -42,5 +42,3 @@ if [ -e "$tmpdir/out" ] || [ -e "$tmpdir/out.c" ]; then
     echo "Found insecure output files in working directory!"
     exit 1
 fi
-trap - EXIT
-rm -rf "$tmpdir"
