@@ -25,7 +25,7 @@ int run_process(const char *program, char *const argv[], int quiet_stderr) {
     if (pid < 0) return -1;
     if (pid == 0) {
         if (quiet_stderr) {
-            if (!freopen("/dev/null", "w", stderr)) _exit(127);
+            if (freopen("/dev/null", "w", stderr) == NULL) _exit(1);
         }
         execvp(program, argv);
         _exit(127);
@@ -262,7 +262,7 @@ int main(int argc, char **argv) {
     
     int ret = compile_and_run(src_path, bin_path, 1);
     if (ret != 0) {
-        // Try with more verbose error output
+        // Try again with verbose error output to help diagnose compilation issues
         ret = compile_and_run(src_path, bin_path, 0);
     }
     
