@@ -126,9 +126,10 @@ class AdoLSP:
         word, _, _ = self.find_word_at(uri, line, col)
         if not word: return []
         refs = []
+        pattern = re.compile(r'\b' + re.escape(word) + r'\b')
         for doc_uri, doc_text in self.docs.items():
             for i, doc_line in enumerate(doc_text.split('\n')):
-                for match in re.finditer(r'\b' + re.escape(word) + r'\b', doc_line):
+                for match in pattern.finditer(doc_line):
                     refs.append(Reference(uri=doc_uri, line=i, col=match.start(), end_col=match.end()))
         return refs
     
@@ -190,7 +191,7 @@ class AdoLSP:
                     items.append({'label': name, 'kind': 3,
                         'detail': f"fn {name}({', '.join(params)})",
                         'documentation': sym.docstring or f"Function at line {sym.line + 1}",
-                        'insertText': f"{name}({', '.join(f'${i+1}:{p}}' for i,p in enumerate(params))})" if params else f"{name}($1)",
+                        'insertText': f"{name}({', '.join(['${' + str(i+1) + ':' + p + '}' for i,p in enumerate(params)])})" if params else f"{name}($1)",
                         'insertTextFormat': 2})
                     break
                 elif sym.kind == 'variable':
