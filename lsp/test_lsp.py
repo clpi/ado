@@ -63,10 +63,13 @@ def test_lsp():
         'rootUri': 'file:///test',
         'capabilities': {}
     })
-    while True:
-        response = read_response(proc)
-        if 'id' in response:
-            break
+    def wait_for_response(req_id):
+        while True:
+            res = read_response(proc)
+            if res.get('id') == req_id:
+                return res
+
+    response = wait_for_response(1)
     assert 'result' in response
     assert 'capabilities' in response['result']
     print("   ✓ Initialize successful")
