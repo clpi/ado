@@ -73,6 +73,7 @@ void test_parse_program_stmt() {
     assert(prog->type == AST_BLOCK);
     assert(prog->block.count == 2);
 
+    assert(prog->block.stmts != NULL);
     AST *stmt1 = prog->block.stmts[0];
     assert(stmt1->type == AST_LET);
     assert(strcmp(stmt1->let.name, "x") == 0);
