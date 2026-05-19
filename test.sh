@@ -26,6 +26,7 @@ fi
 echo ""
 echo "Checking compiler does not write ./out or ./out.c..."
 tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
 cp ./main.c ./lexer.c ./parser.c ./codegen.c ./lexer.h ./parser.h ./codegen.h "$tmpdir"/
 cp ./example.do "$tmpdir"/
 (
@@ -35,12 +36,11 @@ cp ./example.do "$tmpdir"/
 )
 if [ $? -ne 0 ]; then
     echo "Failed to compile or run compiler in isolated directory!"
-    rm -rf "$tmpdir"
     exit 1
 fi
 if [ -e "$tmpdir/out" ] || [ -e "$tmpdir/out.c" ]; then
     echo "Found insecure output files in working directory!"
-    rm -rf "$tmpdir"
     exit 1
 fi
+trap - EXIT
 rm -rf "$tmpdir"

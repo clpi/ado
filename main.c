@@ -19,6 +19,10 @@ char *read_file(char *path) {
     return buf;
 }
 
+int is_safe_shell_path(const char *path) {
+    return strchr(path, '\'') == NULL && strchr(path, '\n') == NULL && strchr(path, '\r') == NULL;
+}
+
 void repl(void) {
     char line[4096];
     char buffer[65536];
@@ -100,6 +104,15 @@ void repl(void) {
             char bin_path[256];
             snprintf(src_path, sizeof(src_path), "%s/out.c", tmp_dir);
             snprintf(bin_path, sizeof(bin_path), "%s/out", tmp_dir);
+            if (!is_safe_shell_path(src_path) || !is_safe_shell_path(bin_path)) {
+                fprintf(stderr, "Error: Unsafe temporary path\n");
+                rmdir(tmp_dir);
+                ast_free(ast);
+                free(p);
+                lexer_free(lex);
+                free(src);
+                continue;
+            }
 
             FILE *out = fopen(src_path, "w");
             if (!out) {
@@ -167,6 +180,15 @@ int main(int argc, char **argv) {
         char bin_path[256];
         snprintf(src_path, sizeof(src_path), "%s/out.c", tmp_dir);
         snprintf(bin_path, sizeof(bin_path), "%s/out", tmp_dir);
+        if (!is_safe_shell_path(src_path) || !is_safe_shell_path(bin_path)) {
+            fprintf(stderr, "Error: Unsafe temporary path\n");
+            rmdir(tmp_dir);
+            ast_free(ast);
+            free(p);
+            lexer_free(lex);
+            free(src);
+            return 1;
+        }
 
         FILE *out = fopen(src_path, "w");
         if (!out) {
@@ -223,6 +245,15 @@ int main(int argc, char **argv) {
     char bin_path[256];
     snprintf(src_path, sizeof(src_path), "%s/out.c", tmp_dir);
     snprintf(bin_path, sizeof(bin_path), "%s/out", tmp_dir);
+    if (!is_safe_shell_path(src_path) || !is_safe_shell_path(bin_path)) {
+        fprintf(stderr, "Error: Unsafe temporary path\n");
+        rmdir(tmp_dir);
+        ast_free(ast);
+        free(p);
+        lexer_free(lex);
+        free(src);
+        return 1;
+    }
 
     FILE *out = fopen(src_path, "w");
     if (!out) {
