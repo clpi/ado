@@ -4,6 +4,16 @@ A lightweight, performant programming language that compiles to C.
 
 **File Extension:** `.do` | **Compiler:** `doc` | **Language Server:** `do-lsp`
 
+## Documentation
+
+We have comprehensive documentation available in the `docs/` directory:
+- **[Tutorial](docs/TUTORIAL.md)**: A step-by-step guide to learning Ado.
+- **[Language Reference](docs/REFERENCE.md)**: Full details on syntax, operators, types, and compiler architecture.
+- **[Examples Explained](docs/EXAMPLES.md)**: Commentary on the provided example code.
+- **[Use Cases](docs/USE_CASES.md)**: Sample applications and environments where Ado shines.
+- **[Roadmap](docs/ROADMAP.md)**: Upcoming features and long-term plans.
+- **[Changelog](docs/CHANGELOG.md)**: History of language and tooling updates.
+
 ## Features
 
 - Simple, intuitive syntax inspired by modern languages
