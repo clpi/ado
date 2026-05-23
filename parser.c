@@ -242,9 +242,9 @@ static AST *parse_stmt(Parser *p) {
         AST *ast = new_ast(AST_FOR);
         ast->for_stmt.var = p->cur.value;
         advance(p);
-        advance(p);
+        if (p->cur.type == TOK_IN) advance(p);
         ast->for_stmt.start = parse_expr(p);
-        advance(p);
+        if (p->cur.type == TOK_DOTDOT) advance(p);
         ast->for_stmt.end = parse_expr(p);
         ast->for_stmt.body = parse_block(p);
         return ast;
