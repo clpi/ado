@@ -36,6 +36,22 @@ module.exports = grammar({
       field('value', $._expression)
     ),
 
+    while_statement: $ => seq(
+      'while',
+      field('condition', $._expression),
+      field('body', $.block)
+    ),
+
+    for_statement: $ => seq(
+      'for',
+      field('var', $.identifier),
+      'in',
+      field('start', $._expression),
+      '..',
+      field('end', $._expression),
+      field('body', $.block)
+    ),
+
     if_statement: $ => seq(
       'if',
       field('condition', $._expression),
@@ -73,7 +89,22 @@ module.exports = grammar({
     argument_list: $ => sep1($._expression, ','),
 
     identifier: $ => /[a-zA-Z_][a-zA-Z0-9_]*/,
-    number: $ => /\d+/
+    number: $ => /\d+/,
+    string: $ => /\"[^\"]*\"/,
+    boolean: $ => choice('true', 'false'),
+
+    array_expression: $ => seq(
+      '[',
+      optional(sep1($._expression, ',')),
+      ']'
+    ),
+
+    index_expression: $ => seq(
+      field('array', $._expression),
+      '[',
+      field('index', $._expression),
+      ']'
+    )
   }
 });
 

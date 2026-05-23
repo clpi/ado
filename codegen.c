@@ -114,7 +114,7 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
     switch (ast->type) {
         case AST_LET:
             gen_indent(out, indent);
-            fprintf(out, "int %s=", ast->let.name);
+            fprintf(out, "__auto_type %s=", ast->let.name);
             gen_expr(ast->let.val, out);
             fprintf(out, ";\n");
             break;

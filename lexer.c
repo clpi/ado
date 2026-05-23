@@ -72,6 +72,7 @@ Token lexer_next(Lexer *lex) {
         else if (strcmp(tok.value, "else") == 0) tok.type = TOK_ELSE;
         else if (strcmp(tok.value, "while") == 0) tok.type = TOK_WHILE;
         else if (strcmp(tok.value, "for") == 0) tok.type = TOK_FOR;
+        else if (strcmp(tok.value, "in") == 0) tok.type = TOK_IN;
         else if (strcmp(tok.value, "return") == 0) tok.type = TOK_RETURN;
         else if (strcmp(tok.value, "true") == 0) tok.type = TOK_TRUE;
         else if (strcmp(tok.value, "false") == 0) tok.type = TOK_FALSE;
@@ -101,6 +102,9 @@ Token lexer_next(Lexer *lex) {
         case '*': tok.type = TOK_STAR; break;
         case '/': tok.type = TOK_SLASH; break;
         case '%': tok.type = TOK_PERCENT; break;
+        case '.':
+            if (lex->src[lex->pos] == '.') { lex->pos++; tok.type = TOK_DOTDOT; }
+            break;
         case '=':
             if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_EQ; }
             else tok.type = TOK_ASSIGN;
