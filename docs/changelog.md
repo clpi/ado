@@ -19,5 +19,5 @@ All notable changes to the Ado language will be documented in this file.
   - `fn` for function declaration.
   - `let` for variable binding.
   - Standard arithmetic (`+`, `-`, `*`, `/`, `%`) and comparison (`==`, `<`, `>`, `<=`, `>=`, `!=`) operators.
-  - Conditional `if` / `else` blocks and `while` loops.
+  - Conditional `if` / `else` blocks, `while` loops, and `for` loops.
   - Internal `print` function for I/O operations.
