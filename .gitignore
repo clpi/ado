@@ -4,3 +4,9 @@ plc
 test_main
 out
 out.c
+*.deb
+*.rpm
+*.apk
+*.pkg.tar.zst
+tmp_install/
+dist/

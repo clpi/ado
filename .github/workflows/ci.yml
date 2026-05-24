@@ -28,7 +28,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y ruby ruby-dev rubygems gcc make rpm
+        sudo apt-get install -y ruby ruby-dev rubygems gcc make rpm libarchive-tools zstd
         sudo gem install fpm
 
     - name: Install cross-compiler (Linux aarch64)
@@ -66,7 +66,9 @@ jobs:
         fi
         fpm -s dir -t deb -n ado -v $VERSION -a $ARCH -C ./tmp_install .
         fpm -s dir -t rpm -n ado -v $VERSION -a $RPM_ARCH -C ./tmp_install .
-        ls -la *.deb *.rpm
+        fpm -s dir -t apk -n ado -v $VERSION -a $ARCH -C ./tmp_install .
+        fpm -s dir -t pacman -n ado -v $VERSION -a $RPM_ARCH -C ./tmp_install .
+        ls -la *.deb *.rpm *.apk *.pkg.tar.zst
 
     - name: Check Nix flake
       if: matrix.target == 'x86_64-linux'
