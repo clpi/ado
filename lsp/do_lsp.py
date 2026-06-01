@@ -313,7 +313,7 @@ class AdoLSP:
                 'parameters': parameters
             }],
             'activeSignature': 0,
-            'activeParameter': min(active_param, len(sym.params) - 1) if sym.params else 0
+            'activeParameter': min(active_param, max(0, len(sym.params) - 1))
         }
 
     def handle_formatting(self, msg: dict) -> list:
