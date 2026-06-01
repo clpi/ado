@@ -226,13 +226,13 @@ class AdoLSP:
             }
         }]
 
-    def find_references(self, word: str) -> List[dict]:
+    def find_references(self, word: str, restrict_uri: Optional[str] = None) -> List[dict]:
         refs = []
-        for doc_uri, text in self.docs.items():
+        pattern = re.compile(r'\b' + re.escape(word) + r'\b')
+        docs_to_search = {restrict_uri: self.docs[restrict_uri]} if restrict_uri and restrict_uri in self.docs else self.docs
+        for doc_uri, text in docs_to_search.items():
             lines = text.split('\n')
             for i, line in enumerate(lines):
-                # Simple regex word boundary match to find references
-                pattern = re.compile(r'\b' + re.escape(word) + r'\b')
                 for match in pattern.finditer(line):
                     refs.append({
                         'uri': doc_uri,
