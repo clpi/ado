@@ -344,14 +344,17 @@ class AdoLSP:
                 formatted_lines.append("")
                 continue
 
+            # Strip comments for brace checking
+            brace_check_line = stripped.split('#')[0].strip()
+
             # Decrease indent for closing brace
-            if stripped.startswith('}'):
+            if brace_check_line.startswith('}'):
                 indent_level = max(0, indent_level - 1)
 
             formatted_lines.append("  " * indent_level + stripped)
 
             # Increase indent for opening brace
-            if stripped.endswith('{'):
+            if brace_check_line.endswith('{'):
                 indent_level += 1
 
         new_text = '\n'.join(formatted_lines)
