@@ -252,7 +252,9 @@ class AdoLSP:
         if not word:
             return []
 
-        return self.find_references(word)
+        syms = self.symbols.get(word, [])
+        is_local = any(s.kind in ('variable', 'parameter') for s in syms)
+        return self.find_references(word, restrict_uri=uri if is_local else None)
 
     def handle_hover(self, msg: dict) -> Optional[dict]:
         uri = msg['params']['textDocument']['uri']
