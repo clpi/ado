@@ -172,7 +172,9 @@ class AdoLSP:
     def send(self, msg: dict):
         try:
             content = json.dumps(msg)
-            sys.stdout.write(f"Content-Length: {len(content)}\r\n\r\n{content}")
+            content_bytes = content.encode('utf-8')
+            sys.stdout.write(f"Content-Length: {len(content_bytes)}\r\n\r\n{content}")
+            sys.stdout.flush()
             sys.stdout.flush()
         except Exception:
             pass
