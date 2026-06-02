@@ -36,17 +36,42 @@ class AdoLSP:
                          'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push']
         self.builtins = ['print', 'len', 'push']
 
+    def _mask_text(self, text: str) -> str:
+        """Replace contents of string literals and comments with spaces to avoid false positives."""
+        masked = list(text)
+        in_string = False
+        in_comment = False
+        for i, char in enumerate(masked):
+            if in_comment:
+                if char == '\n':
+                    in_comment = False
+                else:
+                    masked[i] = ' '
+            elif in_string:
+                if char == '"':
+                    in_string = False
+                else:
+                    masked[i] = ' '
+            else:
+                if char == '"':
+                    in_string = True
+                elif char == '#':
+                    in_comment = True
+        return "".join(masked)
+
     def parse_symbols(self, uri: str, text: str):
+        masked_text = self._mask_text(text)
         symbols = []
         lines = text.split('\n')
+        masked_lines = masked_text.split('\n')
         fn_pattern = re.compile(r'fn\s+(\w+)\s*\(([^)]*)\)')
         let_pattern = re.compile(r'let\s+(\w+)\s*=')
 
         brace_count = 0
         active_functions = []
 
-        for i, line in enumerate(lines):
-            match = fn_pattern.search(line)
+        for i, (line, masked_line) in enumerate(zip(lines, masked_lines)):
+            match = fn_pattern.search(masked_line)
             if match:
                 name = match.group(1)
                 params_str = match.group(2)
@@ -72,18 +97,18 @@ class AdoLSP:
 
                 for param in params:
                     param_pattern = re.compile(r'\b' + re.escape(param) + r'\b')
-                    param_match = param_pattern.search(line)
+                    param_match = param_pattern.search(masked_line)
                     if param_match:
                         symbols.append(Symbol(name=param, kind='parameter', uri=uri,
                             line=i, col=param_match.start(), end_line=i, end_col=param_match.end()))
 
-            if '{' in line:
+            if '{' in masked_line:
                 for func_data in active_functions:
                     if not func_data['started']:
                         func_data['started'] = True
                         func_data['base_count'] = brace_count
 
-            brace_count += line.count('{') - line.count('}')
+            brace_count += masked_line.count('{') - masked_line.count('}')
 
             if active_functions:
                 remaining_functions = []
@@ -95,8 +120,8 @@ class AdoLSP:
                         remaining_functions.append(func_data)
                 active_functions = remaining_functions
 
-        for i, line in enumerate(lines):
-            match = let_pattern.search(line)
+        for i, masked_line in enumerate(masked_lines):
+            match = let_pattern.search(masked_line)
             if match:
                 symbols.append(Symbol(name=match.group(1), kind='variable', uri=uri,
                     line=i, col=match.start(1), end_line=i, end_col=match.end(1)))
@@ -107,10 +132,15 @@ class AdoLSP:
             self.symbols[sym.name].append(sym)
     def get_diagnostics(self, uri: str, text: str) -> List[dict]:
         diagnostics = []
+        masked_text = self._mask_text(text)
         # First check for unbalanced braces just in case
-        lines = text.split('\n')
+        lines = masked_text.split('\n')
         brace_stack = []
         paren_stack = []
+
+        let_pattern = re.compile(r'\blet\s+(\w+)\s*(?:[^=]*)$')
+        call_pattern = re.compile(r'\b(\w+)\s*\(')
+
         for i, line in enumerate(lines):
             for j, char in enumerate(line):
                 if char == '{': brace_stack.append((i, j))
@@ -125,6 +155,34 @@ class AdoLSP:
                     else: diagnostics.append({'range': {'start': {'line': i, 'character': j},
                         'end': {'line': i, 'character': j+1}}, 'severity': 1,
                         'message': 'Unexpected closing parenthesis', 'source': 'ado-lsp'})
+
+            # Check for missing let assignments
+            match = re.search(r'\blet\s+(\w+)(?![^=]*=)', line)
+            if match:
+                diagnostics.append({
+                    'range': {
+                        'start': {'line': i, 'character': match.start(1)},
+                        'end': {'line': i, 'character': match.end(1)}
+                    },
+                    'severity': 1,
+                    'message': 'let statement requires assignment',
+                    'source': 'ado-lsp'
+                })
+
+            # Check for undefined functions
+            for match in call_pattern.finditer(line):
+                func_name = match.group(1)
+                if func_name not in self.symbols and func_name not in self.keywords and func_name not in self.builtins:
+                    diagnostics.append({
+                        'range': {
+                            'start': {'line': i, 'character': match.start(1)},
+                            'end': {'line': i, 'character': match.end(1)}
+                        },
+                        'severity': 2, # Warning
+                        'message': f'Undefined function: {func_name}',
+                        'source': 'ado-lsp'
+                    })
+
         if brace_stack:
             i, j = brace_stack.pop()
             diagnostics.append({'range': {'start': {'line': i, 'character': j},
@@ -231,7 +289,8 @@ class AdoLSP:
         pattern = re.compile(r'\b' + re.escape(word) + r'\b')
         docs_to_search = {restrict_uri: self.docs[restrict_uri]} if restrict_uri and restrict_uri in self.docs else self.docs
         for doc_uri, text in docs_to_search.items():
-            lines = text.split('\n')
+            masked_text = self._mask_text(text)
+            lines = masked_text.split('\n')
             for i, line in enumerate(lines):
                 for match in pattern.finditer(line):
                     refs.append({
@@ -334,18 +393,20 @@ class AdoLSP:
         text = self.docs.get(uri)
         if not text: return []
 
+        masked_text = self._mask_text(text)
         lines = text.split('\n')
+        masked_lines = masked_text.split('\n')
         formatted_lines = []
         indent_level = 0
 
-        for line in lines:
+        for line, masked_line in zip(lines, masked_lines):
             stripped = line.strip()
             if not stripped:
                 formatted_lines.append("")
                 continue
 
-            # Strip comments for brace checking
-            brace_check_line = stripped.split('#')[0].strip()
+            # Check masked string for braces
+            brace_check_line = masked_line.strip()
 
             # Decrease indent for closing brace
             if brace_check_line.startswith('}'):
@@ -459,8 +520,166 @@ class AdoLSP:
         return symbols
 
     def handle_code_action(self, msg: dict) -> list:
-        # Minimal empty implementation for now
-        return []
+        uri = msg['params']['textDocument']['uri']
+        context = msg['params'].get('context', {})
+        diagnostics = context.get('diagnostics', [])
+
+        actions = []
+        for diag in diagnostics:
+            if diag.get('message') == 'let statement requires assignment':
+                actions.append({
+                    'title': 'Initialize variable',
+                    'kind': 'quickfix',
+                    'diagnostics': [diag],
+                    'edit': {
+                        'changes': {
+                            uri: [{
+                                'range': {
+                                    'start': diag['range']['end'],
+                                    'end': diag['range']['end']
+                                },
+                                'newText': ' = 0'
+                            }]
+                        }
+                    }
+                })
+        return actions
+
+    def handle_prepare_call_hierarchy(self, msg: dict) -> list:
+        uri = msg['params']['textDocument']['uri']
+        line = msg['params']['position']['line']
+        col = msg['params']['position']['character']
+
+        word = self.get_symbol_at_pos(uri, line, col)
+        if not word or word not in self.symbols: return []
+
+        sym = self.symbols[word][0]
+        if sym.kind != 'function': return []
+
+        return [{
+            'name': sym.name,
+            'kind': 12, # Function
+            'uri': sym.uri,
+            'range': {
+                'start': {'line': sym.line, 'character': sym.col},
+                'end': {'line': sym.end_line, 'character': sym.end_col}
+            },
+            'selectionRange': {
+                'start': {'line': sym.line, 'character': sym.col},
+                'end': {'line': sym.line, 'character': sym.col + len(sym.name)}
+            }
+        }]
+
+    def handle_call_hierarchy_incoming(self, msg: dict) -> list:
+        item = msg['params']['item']
+        func_name = item['name']
+
+        refs = self.find_references(func_name)
+        incoming = []
+
+        for ref in refs:
+            ref_uri = ref['uri']
+            ref_line = ref['range']['start']['line']
+
+            # Find which function this reference is inside
+            caller_sym = None
+            for name, sym_list in self.symbols.items():
+                for sym in sym_list:
+                    if sym.kind == 'function' and sym.uri == ref_uri:
+                        if sym.line <= ref_line <= sym.end_line:
+                            caller_sym = sym
+                            break
+                if caller_sym: break
+
+            if caller_sym:
+                incoming.append({
+                    'from': {
+                        'name': caller_sym.name,
+                        'kind': 12, # Function
+                        'uri': caller_sym.uri,
+                        'range': {
+                            'start': {'line': caller_sym.line, 'character': caller_sym.col},
+                            'end': {'line': caller_sym.end_line, 'character': caller_sym.end_col}
+                        },
+                        'selectionRange': {
+                            'start': {'line': caller_sym.line, 'character': caller_sym.col},
+                            'end': {'line': caller_sym.line, 'character': caller_sym.col + len(caller_sym.name)}
+                        }
+                    },
+                    'fromRanges': [ref['range']]
+                })
+        return incoming
+
+    def handle_call_hierarchy_outgoing(self, msg: dict) -> list:
+        item = msg['params']['item']
+        uri = item['uri']
+
+        start_line = item['range']['start']['line']
+        end_line = item['range']['end']['line']
+
+        text = self.docs.get(uri)
+        if not text: return []
+
+        masked_text = self._mask_text(text)
+        lines = masked_text.split('\n')
+
+        outgoing = []
+        call_pattern = re.compile(r'\b(\w+)\s*\(')
+
+        for i in range(start_line, min(end_line + 1, len(lines))):
+            for match in call_pattern.finditer(lines[i]):
+                called_name = match.group(1)
+                if called_name in self.symbols and self.symbols[called_name][0].kind == 'function':
+                    called_sym = self.symbols[called_name][0]
+                    outgoing.append({
+                        'to': {
+                            'name': called_sym.name,
+                            'kind': 12, # Function
+                            'uri': called_sym.uri,
+                            'range': {
+                                'start': {'line': called_sym.line, 'character': called_sym.col},
+                                'end': {'line': called_sym.end_line, 'character': called_sym.end_col}
+                            },
+                            'selectionRange': {
+                                'start': {'line': called_sym.line, 'character': called_sym.col},
+                                'end': {'line': called_sym.line, 'character': called_sym.col + len(called_sym.name)}
+                            }
+                        },
+                        'fromRanges': [{
+                            'start': {'line': i, 'character': match.start(1)},
+                            'end': {'line': i, 'character': match.end(1)}
+                        }]
+                    })
+        return outgoing
+
+    def handle_folding_range(self, msg: dict) -> list:
+        uri = msg['params']['textDocument']['uri']
+        text = self.docs.get(uri)
+        if not text: return []
+
+        masked_text = self._mask_text(text)
+        lines = masked_text.split('\n')
+
+        folds = []
+        stack = []
+
+        for i, line in enumerate(lines):
+            for j, char in enumerate(line):
+                if char == '{':
+                    stack.append((i, j))
+                elif char == '}':
+                    if stack:
+                        start_line, start_col = stack.pop()
+                        # Only fold if it spans multiple lines
+                        if start_line < i:
+                            folds.append({
+                                'startLine': start_line,
+                                'startCharacter': start_col,
+                                'endLine': i,
+                                'endCharacter': j,
+                                'kind': 'region'
+                            })
+        return folds
 
     def handle_code_lens(self, msg: dict) -> list:
         # Minimal empty implementation for now
@@ -501,6 +720,132 @@ class AdoLSP:
 
         return {'isIncomplete': False, 'items': items}
 
+    def handle_document_highlight(self, msg: dict) -> list:
+        uri = msg['params']['textDocument']['uri']
+        line = msg['params']['position']['line']
+        col = msg['params']['position']['character']
+
+        word = self.get_symbol_at_pos(uri, line, col)
+        if not word: return []
+
+        refs = self.find_references(word, restrict_uri=uri)
+        highlights = []
+        for ref in refs:
+            highlights.append({
+                'range': ref['range'],
+                'kind': 1 # Text
+            })
+        return highlights
+
+    def handle_inlay_hint(self, msg: dict) -> list:
+        uri = msg['params']['textDocument']['uri']
+        text = self.docs.get(uri)
+        if not text: return []
+
+        masked_text = self._mask_text(text)
+        lines = masked_text.split('\n')
+
+        start_line = msg['params']['range']['start']['line']
+        end_line = msg['params']['range']['end']['line']
+
+        hints = []
+        call_pattern = re.compile(r'\b(\w+)\s*\(')
+
+        for i in range(start_line, min(end_line + 1, len(lines))):
+            line = lines[i]
+            for match in call_pattern.finditer(line):
+                func_name = match.group(1)
+                if func_name in self.symbols:
+                    sym = self.symbols[func_name][0]
+                    if sym.kind == 'function' and sym.params:
+                        # Simple heuristic: find commas to place parameter hints
+                        args_start = match.end()
+                        paren_count = 1
+                        arg_idx = 0
+                        current_pos = args_start
+
+                        # Add first parameter hint right after opening parenthesis
+                        if arg_idx < len(sym.params):
+                            # Skip leading whitespace
+                            while current_pos < len(line) and line[current_pos].isspace():
+                                current_pos += 1
+                            if current_pos < len(line) and line[current_pos] != ')':
+                                hints.append({
+                                    'position': {'line': i, 'character': current_pos},
+                                    'label': f"{sym.params[arg_idx]}: ",
+                                    'kind': 2, # Parameter
+                                    'paddingRight': True
+                                })
+                                arg_idx += 1
+
+                        while current_pos < len(line) and paren_count > 0:
+                            char = line[current_pos]
+                            if char == '(': paren_count += 1
+                            elif char == ')': paren_count -= 1
+                            elif char == ',' and paren_count == 1:
+                                if arg_idx < len(sym.params):
+                                    hint_pos = current_pos + 1
+                                    while hint_pos < len(line) and line[hint_pos].isspace():
+                                        hint_pos += 1
+                                    hints.append({
+                                        'position': {'line': i, 'character': hint_pos},
+                                        'label': f"{sym.params[arg_idx]}: ",
+                                        'kind': 2, # Parameter
+                                        'paddingRight': True
+                                    })
+                                    arg_idx += 1
+                            current_pos += 1
+        return hints
+
+    def handle_semantic_tokens_full(self, msg: dict) -> dict:
+        uri = msg['params']['textDocument']['uri']
+        text = self.docs.get(uri)
+        if not text: return {'data': []}
+
+        masked_text = self._mask_text(text)
+        lines = masked_text.split('\n')
+
+        tokens = []
+        token_types = {
+            'keyword': 0,
+            'function': 1,
+            'variable': 2,
+            'parameter': 3
+        }
+
+        for i, line in enumerate(lines):
+            # Find keywords
+            for kw in self.keywords:
+                for match in re.finditer(r'\b' + re.escape(kw) + r'\b', line):
+                    tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
+
+            # Find symbols
+            for sym_name, sym_list in self.symbols.items():
+                if sym_name in self.keywords: continue
+                sym = sym_list[0]
+                for match in re.finditer(r'\b' + re.escape(sym_name) + r'\b', line):
+                    t_type = token_types.get(sym.kind, 2)
+                    tokens.append((i, match.start(), match.end() - match.start(), t_type, 0))
+
+        # Sort tokens by line and column
+        tokens.sort(key=lambda t: (t[0], t[1]))
+
+        # Calculate relative positions
+        data = []
+        prev_line = 0
+        prev_start = 0
+
+        for line, start, length, t_type, t_mod in tokens:
+            delta_line = line - prev_line
+            delta_start = start if delta_line > 0 else start - prev_start
+
+            data.extend([delta_line, delta_start, length, t_type, t_mod])
+
+            prev_line = line
+            prev_start = start
+
+        return {'data': data}
+
     def handle_initialize(self, msg: dict) -> dict:
         return {
             'capabilities': {
@@ -525,7 +870,18 @@ class AdoLSP:
                 'codeActionProvider': True,
                 'codeLensProvider': {
                     'resolveProvider': False
-                }
+                },
+                'semanticTokensProvider': {
+                    'legend': {
+                        'tokenTypes': ['keyword', 'function', 'variable', 'parameter'],
+                        'tokenModifiers': []
+                    },
+                    'full': True
+                },
+                'inlayHintProvider': True,
+                'documentHighlightProvider': True,
+                'foldingRangeProvider': True,
+                'callHierarchyProvider': True
             }
         }
 
@@ -562,6 +918,13 @@ class AdoLSP:
                 elif method == 'workspace/symbol': result = self.handle_workspace_symbols(msg)
                 elif method == 'textDocument/codeAction': result = self.handle_code_action(msg)
                 elif method == 'textDocument/codeLens': result = self.handle_code_lens(msg)
+                elif method == 'textDocument/foldingRange': result = self.handle_folding_range(msg)
+                elif method == 'textDocument/semanticTokens/full': result = self.handle_semantic_tokens_full(msg)
+                elif method == 'textDocument/inlayHint': result = self.handle_inlay_hint(msg)
+                elif method == 'textDocument/documentHighlight': result = self.handle_document_highlight(msg)
+                elif method == 'textDocument/prepareCallHierarchy': result = self.handle_prepare_call_hierarchy(msg)
+                elif method == 'callHierarchy/incomingCalls': result = self.handle_call_hierarchy_incoming(msg)
+                elif method == 'callHierarchy/outgoingCalls': result = self.handle_call_hierarchy_outgoing(msg)
                 elif method == 'shutdown': result = None
                 elif method == 'exit': break
                 if 'id' in msg: self.send({'id': msg['id'], 'result': result})
