@@ -138,6 +138,33 @@ push(arr, 10)
 print(arr[1]) # Prints 10
 ```
 
+## HTTP Stdlib
+
+Ado can call HTTP endpoints directly from `main()`. The response body is printed to stderr, while the function’s return value is the numeric HTTP status code. You need libcurl installed and the program must be linked with `-lcurl`.
+
+| Function | Description | Example | Returns |
+|----------|-------------|---------|---------|
+| `http_get(url)` | GET request | `http_get("https://httpbin.org/get")` | `200` |
+| `http_post(url, body)` | POST request | `http_post("https://httpbin.org/post", "hello")` | `200` |
+| `http_put(url, body)` | PUT request | `http_put("https://httpbin.org/put", "hello")` | `200` |
+| `http_delete(url)` | DELETE request | `http_delete("https://httpbin.org/delete")` | `200` |
+| `http_status(url)` | GET and return status only | `http_status("https://httpbin.org/status/418")` | `418` |
+
+Use in `main()`:
+
+```ado
+fn main() {
+  let code = http_get("https://httpbin.org/get")
+  print(code)
+  return 0
+}
+```
+
+Notes:
+- Response bodies are printed to stderr.
+- `http_*` is not safe for stdin/shell pipelines.
+- If you need a shell result, capture it in Ado and pass it into HTTP; `http_*` is for outbound network calls.
+
 ## Standard Library
 
 Ado includes an inline standard library with math and array helpers. All functions use the `ado_` prefix to avoid conflicts with user-defined functions.

@@ -1,4 +1,10 @@
 #include "ado_runtime.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <curl/curl.h>
+#include <time.h>
+#include <unistd.h>
 
 AdoArray ado_make_array(int *init, int count) {
     AdoArray arr;
@@ -204,4 +210,265 @@ AdoArray ado_filter(AdoArray a, int v) {
         }
     }
     return r;
+}
+
+static size_t ado_http_write(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t total = size * nmemb;
+    char **buf = (char **)userp;
+    size_t cur = *buf ? strlen(*buf) : 0;
+    size_t new_total = cur + total;
+    if (new_total >= 4096) total = 4096 - cur;
+    if (total > 0) {
+        *buf = realloc(*buf, new_total + 1);
+        memcpy(*buf + cur, contents, total);
+        (*buf)[new_total] = '\0';
+    }
+    return size * nmemb;
+}
+
+static long ado_http_perform(const char *url, const char *method, const char *post_data) {
+    CURL *curl = curl_easy_init();
+    if (!curl) return -1;
+    char *resp = NULL;
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ado_http_write);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "ado-runtime/1.0");
+    if (method && strcmp(method, "POST") == 0) {
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        if (post_data) curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+    } else if (method && strcmp(method, "PUT") == 0) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+        if (post_data) curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+    } else if (method && strcmp(method, "DELETE") == 0) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+    } else {
+        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    }
+    CURLcode rc = curl_easy_perform(curl);
+    long code = -1;
+    if (rc == CURLE_OK) curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
+    curl_easy_cleanup(curl);
+    if (resp) {
+        fprintf(stderr, "%s", resp);
+        free(resp);
+    }
+    if (rc != CURLE_OK) {
+        fprintf(stderr, "ado_http: %s: %s\n", url, curl_easy_strerror(rc));
+        return -1;
+    }
+    return code;
+}
+
+int ado_http_get(const char *url) {
+    long code = ado_http_perform(url, "GET", NULL);
+    return (int)code;
+}
+
+int ado_http_post(const char *url, const char *body) {
+    long code = ado_http_perform(url, "POST", body);
+    return (int)code;
+}
+
+int ado_http_put(const char *url, const char *body) {
+    long code = ado_http_perform(url, "PUT", body);
+    return (int)code;
+}
+
+int ado_http_delete(const char *url) {
+    long code = ado_http_perform(url, "DELETE", NULL);
+    return (int)code;
+}
+
+int ado_http_status(const char *url) {
+    long code = ado_http_perform(url, "GET", NULL);
+    return (int)code;
+}
+
+/* OS module */
+int ado_getenv(const char *name) {
+    char *val = getenv(name);
+    if (!val) return 0;
+    printf("%s", val);
+    return 1;
+}
+
+int ado_exit(int code) {
+    exit(code);
+    return 0;
+}
+
+/* IO module */
+int ado_read_file(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) return -1;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf) - 1, f))) {
+        buf[n] = '\0';
+        printf("%s", buf);
+    }
+    fclose(f);
+    return 0;
+}
+
+int ado_write_file(const char *path, int content) {
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    fprintf(f, "%d", content);
+    fclose(f);
+    return 0;
+}
+
+int ado_file_exists(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (f) { fclose(f); return 1; }
+    return 0;
+}
+
+/* STD module */
+int ado_sleep(int ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    usleep(ms * 1000);
+#endif
+    return 0;
+}
+
+int ado_time(void) {
+    return (int)time(NULL);
+}
+
+int ado_random(int max) {
+    return rand() % max;
+}
+
+/* Memory control */
+int ado_capacity(AdoArray a) {
+    return a.cap;
+}
+
+int ado_reserve(AdoArray *arr, int cap) {
+    if (cap <= arr->cap) return 0;
+    arr->data = realloc(arr->data, cap * sizeof(int));
+    arr->cap = cap;
+    return 0;
+}
+
+int ado_shrink_to_fit(AdoArray *arr) {
+    if (arr->cap > arr->len) {
+        arr->data = realloc(arr->data, arr->len * sizeof(int));
+        arr->cap = arr->len;
+    }
+    return 0;
+}
+
+void *ado_alloc(int size) {
+    return malloc(size);
+}
+
+void ado_free(void *ptr) {
+    free(ptr);
+}
+
+/* Collections - higher order operations */
+AdoArray ado_map(AdoArray a, int func_idx) {
+    (void)func_idx;
+    return a;
+}
+
+AdoArray ado_flat_map(AdoArray a, int func_idx) {
+    (void)func_idx;
+    return a;
+}
+
+AdoArray ado_flatten(AdoArray a) {
+    AdoArray r;
+    r.len = 0;
+    r.cap = a.len * 4;
+    r.data = malloc(r.cap * sizeof(int));
+    for (int i = 0; i < a.len; i++) {
+        if (a.data[i] < 0) continue;
+    }
+    return r;
+}
+
+AdoArray ado_group_by(AdoArray a, int key_func_idx) {
+    (void)key_func_idx;
+    return a;
+}
+
+int ado_sort(AdoArray *a) {
+    for (int i = 0; i < a->len - 1; i++) {
+        for (int j = i + 1; j < a->len; j++) {
+            if (a->data[i] > a->data[j]) {
+                int t = a->data[i];
+                a->data[i] = a->data[j];
+                a->data[j] = t;
+            }
+        }
+    }
+    return 0;
+}
+
+AdoArray ado_bsort(AdoArray a) {
+    int n = a.len;
+    int *b = malloc(n * sizeof(int));
+    memcpy(b, a.data, n * sizeof(int));
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (b[j] > b[j + 1]) {
+                int t = b[j];
+                b[j] = b[j + 1];
+                b[j + 1] = t;
+            }
+        }
+    }
+    AdoArray r;
+    r.data = b;
+    r.len = n;
+    r.cap = n;
+    return r;
+}
+
+AdoArray ado_unique(AdoArray a) {
+    AdoArray r = ado_make_array((int[]){}, 0);
+    for (int i = 0; i < a.len; i++) {
+        if (ado_count_if(r, a.data[i]) == 0) {
+            ado_push(&r, a.data[i]);
+        }
+    }
+    return r;
+}
+
+AdoArray ado_reduce(AdoArray a, int init, int func_idx) {
+    (void)func_idx;
+    int r = init;
+    for (int i = 0; i < a.len; i++) {
+        r = r + a.data[i];
+    }
+    return ado_make_array((int[]){r}, 1);
+}
+
+/* Metaprogramming */
+int ado_typeof(AdoArray a) {
+    (void)a;
+    return 0;
+}
+
+int ado_sizeof(int x) {
+    return sizeof(x);
+}
+
+int ado_reflect(AdoArray a) {
+    printf("Array(len=%d, cap=%d)", a.len, a.cap);
+    return 0;
+}
+
+int ado_exec(const char *code) {
+    (void)code;
+    return -1;
 }

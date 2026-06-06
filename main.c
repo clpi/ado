@@ -99,7 +99,10 @@ void repl(void) {
             printf("  I/O: print(expr1, expr2, ...)\n");
             printf("  Operators: + - * / %% == != < > <= >= and or not\n");
             printf("  Arrays: [1, 2, 3], arr[index]\n");
-            printf("  Strings: \"hello\\nworld\"\n\n");
+            printf("  Strings: \"hello\\nworld\"\n");
+            printf("  OS: ado_getenv(name), ado_exit(code)\n");
+            printf("  IO: ado_read_file(path), ado_write_file(path, val), ado_file_exists(path)\n");
+            printf("  STD: ado_sleep(ms), ado_time(), ado_random(max)\n\n");
             continue;
         }
         if (strncmp(line, "clear", 5) == 0) {

@@ -42,4 +42,47 @@ AdoArray ado_concat(AdoArray a, AdoArray b);
 AdoArray ado_fill(int n, int v);
 AdoArray ado_filter(AdoArray a, int v);
 
+int ado_http_get(const char *url);
+int ado_http_post(const char *url, const char *body);
+int ado_http_put(const char *url, const char *body);
+int ado_http_delete(const char *url);
+int ado_http_status(const char *url);
+
+/* OS module */
+int ado_getenv(const char *name);
+int ado_exit(int code);
+
+/* IO module */
+int ado_read_file(const char *path);
+int ado_write_file(const char *path, int content);
+int ado_file_exists(const char *path);
+
+/* STD module */
+int ado_sleep(int ms);
+int ado_time();
+int ado_random(int max);
+
+/* Memory control */
+int ado_capacity(AdoArray a);
+int ado_reserve(AdoArray *arr, int cap);
+int ado_shrink_to_fit(AdoArray *arr);
+void *ado_alloc(int size);
+void ado_free(void *ptr);
+
+/* Collections - higher order operations */
+AdoArray ado_map(AdoArray a, int func_idx);
+AdoArray ado_flat_map(AdoArray a, int func_idx);
+AdoArray ado_flatten(AdoArray a);
+AdoArray ado_group_by(AdoArray a, int key_func_idx);
+int ado_sort(AdoArray *a);
+AdoArray ado_bsort(AdoArray a);
+AdoArray ado_unique(AdoArray a);
+AdoArray ado_reduce(AdoArray a, int init, int func_idx);
+
+/* Metaprogramming */
+int ado_typeof(AdoArray a);
+int ado_sizeof(int x);
+int ado_reflect(AdoArray a);
+int ado_exec(const char *code);
+
 #endif

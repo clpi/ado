@@ -1,6 +1,5 @@
 CC ?= cc
 CFLAGS ?= -O2
-LDFLAGS ?=
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -8,17 +7,17 @@ BINDIR ?= $(PREFIX)/bin
 SRCS = main.c lexer.c parser.c codegen.c codegen_wasm.c
 OBJS = $(SRCS:.c=.o)
 
-TEST_SRCS = test_main.c lexer.c parser.c codegen.c
+TEST_SRCS = test_main.c lexer.c parser.c codegen.c codegen_wasm.c
 
 .PHONY: all clean test bench install install-lsp uninstall wasm-test
 
 all: doc
 
 doc: $(SRCS)
-	$(CC) $(CFLAGS) -o $@ $(SRCS) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(SRCS) -lcurl
 
 test_main: $(TEST_SRCS)
-	$(CC) $(CFLAGS) -o $@ $(TEST_SRCS) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(TEST_SRCS) -lcurl
 
 test: doc test_main
 	./test.sh

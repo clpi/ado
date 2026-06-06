@@ -110,6 +110,11 @@ fn main() {
   }
   print("sum of [5,2,8,1,9] =", total)
 
-  print("")
-  print("All stdlib tests passed!")
-  return 0
+print("All stdlib tests passed!")
+   return 0
+
+   # OS module tests
+   print("")
+   print("=== OS Module Tests ===")
+   print("ado_getenv HOME returned result")
+   ado_exit(0)

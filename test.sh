@@ -31,7 +31,7 @@ echo "========================================="
 
 echo ""
 echo "Running C unit tests..."
-if cc -o test_main test_main.c lexer.c parser.c codegen.c; then
+if cc -o test_main test_main.c lexer.c parser.c codegen.c codegen_wasm.c -lcurl; then
     ./test_main
     res=$?
     if [ $res -ne 0 ]; then
