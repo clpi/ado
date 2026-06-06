@@ -52,7 +52,7 @@ TOTAL:  1.12x  (was 1.28x before optimizations)
 
 ## Documentation
 
-Comprehensive markdown documentation for the language (including tutorials, reference, examples, use cases, roadmap, and changelog) is located in the `docs/` directory.
+Robust and comprehensive markdown documentation for the language (including tutorials, reference, examples, use cases, roadmap, and changelog) is located in the `docs/` directory.
 
 ---
 **Note:** Always verify your work by running the relevant tests (`make test`, `python3 lsp/test_lsp.py`, etc.) and ensure compatibility with the existing CI/CD workflow and documentation structure.
