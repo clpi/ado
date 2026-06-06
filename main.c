@@ -95,14 +95,17 @@ void repl(void) {
             printf("Language features:\n");
             printf("  Functions: fn name(params) { body }\n");
             printf("  Variables: let x = value\n");
+            printf("  Typed vars: let x::Type = value (required), let x:Type = value (optional)\n");
+            printf("  Pipe forward: value |> fn_name\n");
+            printf("  Hints: @hint_name fn_name, @memo fn_name (auto-memoization)\n");
+            printf("  Enum types: enum Name variant1, variant2 { ... }\n");
+            printf("  Match: match expr { pattern => result }\n");
             printf("  Control: if condition { } else { }, while condition { }, for i in start..end { }\n");
             printf("  I/O: print(expr1, expr2, ...)\n");
-            printf("  Operators: + - * / %% == != < > <= >= and or not\n");
+            printf("  Operators: + - * / %% == != < > <= >= and or or not\n");
             printf("  Arrays: [1, 2, 3], arr[index]\n");
             printf("  Strings: \"hello\\nworld\"\n");
-            printf("  OS: ado_getenv(name), ado_exit(code)\n");
-            printf("  IO: ado_read_file(path), ado_write_file(path, val), ado_file_exists(path)\n");
-            printf("  STD: ado_sleep(ms), ado_time(), ado_random(max)\n\n");
+            printf("  WASM: --target wasm compiles to WebAssembly\n\n");
             continue;
         }
         if (strncmp(line, "clear", 5) == 0) {
@@ -206,7 +209,8 @@ int main(int argc, char **argv) {
         codegen_wasm(ast, wat_out);
         fclose(wat_out);
         fprintf(stderr, "WAT output written to %s\n", wat_path);
-        fprintf(stderr, "Compile to WASM with: wat2wasm %s -o %s.wasm\n", wat_path, src_path);
+        fprintf(stderr, "Compile to WASM: wat2wasm %s -o %s.wasm\n", wat_path, src_path);
+        fprintf(stderr, "Run with WASM runtime: wasmtime %s.wasm\n", src_path);
         return 0;
     }
     

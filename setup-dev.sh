@@ -42,8 +42,8 @@ fi
 echo ""
 
 # Make LSP executable
-chmod +x lsp/do_lsp.py 2>/dev/null || true
-echo "✓ LSP server ready: lsp/do_lsp.py"
+chmod +x lsp/ado_lsp.py 2>/dev/null || true
+echo "✓ LSP server ready: lsp/ado_lsp.py"
 echo ""
 
 # Setup Tree-sitter

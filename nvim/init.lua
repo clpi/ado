@@ -37,11 +37,11 @@ end
 
 -- Find LSP: check PATH first, then fall back to repo path
 local function find_lsp()
-  local lsp_in_path = vim.fn.executable("do-lsp")
+  local lsp_in_path = vim.fn.executable("ado-lsp")
   if lsp_in_path == 1 then
-    return "do-lsp"
+    return "ado-lsp"
   end
-  return project_root .. "/lsp/do-lsp.py"
+  return project_root .. "/lsp/ado_lsp.py"
 end
 
 -- Set up LSP

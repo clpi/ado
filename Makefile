@@ -40,11 +40,11 @@ install: doc install-lsp
 
 install-lsp:
 	install -d $(DESTDIR)$(BINDIR)
-	install -m 755 lsp/do_lsp.py $(DESTDIR)$(BINDIR)/do-lsp
+	install -m 755 lsp/ado_lsp.py $(DESTDIR)$(BINDIR)/ado-lsp
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/ado
-	rm -f $(DESTDIR)$(BINDIR)/do-lsp
+	rm -f $(DESTDIR)$(BINDIR)/ado-lsp
 
 clean:
 	rm -f doc test_main

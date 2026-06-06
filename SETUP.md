@@ -38,7 +38,7 @@ Launch Neovim with:
 - `<leader>rn` - Rename symbol
 - `<leader>f` - Format document
 
-### LSP Server (`lsp/do_lsp.py`)
+### LSP Server (`lsp/ado_lsp.py`)
 
 Comprehensive Language Server Protocol implementation:
 - Code completion with snippets
@@ -76,7 +76,7 @@ ado/
 │   ├── collatz.do
 │   └── conditionals.do
 ├── lsp/                  # Language Server
-│   ├── do_lsp.py        # LSP implementation
+│   ├── ado_lsp.py        # LSP implementation
 │   ├── test_lsp.py      # Test suite
 │   ├── README.md
 │   └── FEATURES.md

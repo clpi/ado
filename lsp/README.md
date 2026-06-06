@@ -33,8 +33,8 @@ vim.api.nvim_create_autocmd("FileType", {
   pattern = "ado",
   callback = function()
     vim.lsp.start({
-      name = "do_lsp",
-      cmd = {vim.fn.expand("~/.local/bin/do_lsp")},
+      name = "ado_lsp",
+      cmd = {vim.fn.expand("~/.local/bin/ado-lsp")},
       root_dir = vim.fs.dirname(vim.fs.find({"build.sh"}, { upward = true })[1]),
     })
   end,
@@ -43,8 +43,8 @@ vim.api.nvim_create_autocmd("FileType", {
 
 Install the LSP:
 ```bash
-cp lsp/do_lsp.py ~/.local/bin/do_lsp
-chmod +x ~/.local/bin/do_lsp
+cp lsp/ado_lsp.py ~/.local/bin/ado-lsp
+chmod +x ~/.local/bin/ado-lsp
 ```
 
 ## Setup for VS Code
@@ -56,7 +56,7 @@ chmod +x ~/.local/bin/do_lsp
 {
   "genericLSP.languageServers": {
     "ado": {
-      "command": "/path/to/ado/lsp/do_lsp.py",
+      "command": "/path/to/ado/lsp/ado_lsp.py",
       "fileExtensions": ["ado"]
     }
   }

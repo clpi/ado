@@ -99,6 +99,11 @@ static void gen_expr(AST *ast, FILE *out) {
             gen_expr(ast->len.arr, out);
             fprintf(out, ".len");
             break;
+        case AST_PIPE:
+            fprintf(out, "%s(", ast->call.name);
+            gen_expr(ast->call.args[0], out);
+            fprintf(out, ")");
+            break;
         default:
             break;
     }
@@ -217,6 +222,19 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             break;
         case AST_BLOCK:
             gen_block(ast, out, indent);
+            break;
+        case AST_MATCH:
+            gen_indent(out, indent);
+            fprintf(out, "if(0){/*match stub*/}\n");
+            break;
+        case AST_ENUM:
+            gen_indent(out, indent);
+            fprintf(out, "/* enum %s: ", ast->enum_def.enum_name);
+            for (int i = 0; i < ast->enum_def.variant_count; i++) {
+                fprintf(out, "%s", ast->enum_def.variants[i]->var_name);
+                if (i < ast->enum_def.variant_count - 1) fprintf(out, ", ");
+            }
+            fprintf(out, " */\n");
             break;
         default:
             gen_indent(out, indent);

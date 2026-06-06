@@ -2,7 +2,7 @@
 
 A lightweight, performant programming language that compiles to C.
 
-**File Extension:** `.do` | **Compiler:** `doc` | **Language Server:** `do-lsp`
+**File Extension:** `.do` | **Compiler:** `doc` | **Language Server:** `ado-lsp`
 
 ## Features
 
@@ -85,7 +85,7 @@ fn main() {
 # Build the compiler
 make
 
-# Install binary (ado) and LSP (do-lsp) to /usr/local/bin
+# Install binary (ado) and LSP (ado-lsp) to /usr/local/bin
 sudo make install
 
 # Uninstall
@@ -215,7 +215,7 @@ Source (.do) → Lexer → Parser → AST → Codegen → C → Binary
 ├── parser.c/h          # Parser
 ├── codegen.c/h         # Code generator
 ├── lsp/
-│   └── do-lsp.py       # Language server
+│   └── ado-lsp.py       # Language server
 ├── nvim/
 │   └── init.lua        # Neovim config
 ├── tree-sitter-do/     # Tree-sitter grammar

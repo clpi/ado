@@ -37,7 +37,8 @@ class AdoLSP:
         self.docs: Dict[str, str] = {}
         self.symbols: Dict[str, List[Symbol]] = {}
         self.keywords = ['fn', 'let', 'if', 'else', 'while', 'for', 'return',
-                         'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push']
+                         'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push',
+                         'hint', 'type', 'inline', 'const', 'static']
         self.builtins = ['print', 'len', 'push']
 
     def _mask_text(self, text: str) -> str:

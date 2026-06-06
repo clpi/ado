@@ -363,18 +363,27 @@ void codegen_wasm(AST *ast, FILE *out) {
 
     // Array operations
     fprintf(out, "  (func $ado_push (param $arr i32) (param $val i32)\n");
-    fprintf(out, "    local.get $arr\n    i32.load align=4 ;; len\n");
+    fprintf(out, "    (local $len i32) (local $cap i32) (local $newcap i32)\n");
+    fprintf(out, "    local.get $arr\n    i32.load\n");
     fprintf(out, "    local.tee $len\n");
-    fprintf(out, "    local.get $arr\n    i32.load offset=4 align=4 ;; cap\n");
+    fprintf(out, "    local.get $arr\n    i32.load offset=4\n");
     fprintf(out, "    local.tee $cap\n");
-    fprintf(out, "    local.get $len\n    i32.eqz\n");
-    fprintf(out, "    if\n      i32.const 4\n      local.set $cap\n    end\n");
-    fprintf(out, "    local.get $len\n    local.get $cap\n    i32.ge_s\n");
-    fprintf(out, "    if (result i32)\n      local.get $cap\n      i32.const 2\n      i32.mul ;; new_cap\n");
-    fprintf(out, "    else\n      local.get $cap\n    end\n");
+    fprintf(out, "    local.get $len\n    i32.ge_s\n");
+    fprintf(out, "    if (result i32)\n      local.get $cap\n      i32.const 2\n      i32.mul\n    else\n      local.get $cap\n    end\n");
     fprintf(out, "    local.tee $newcap\n");
-    fprintf(out, "    (; grow array data ;)\n");
-    fprintf(out, "    ;; simple version: just store if room, else grow\n");
+    fprintf(out, "    i32.const 4\n    i32.mul\n    call $malloc\n");
+    fprintf(out, "    local.get $arr\n");
+    fprintf(out, "    i32.load\n");
+    fprintf(out, "    local.get $arr\n    i32.load offset=4\n");
+    fprintf(out, "    i32.const 4\n    i32.mul\n    call $memcpy\n    drop\n");
+    fprintf(out, "    local.get $arr\n    local.get $val\n");
+    fprintf(out, "    i32.store\n");
+    fprintf(out, "    local.get $arr\n    local.get $len\n    i32.const 1\n    i32.add\n    i32.store\n");
+    fprintf(out, "  )\n");
+
+    // WASI exports for host functions
+    fprintf(out, "  (import \"wasi_snapshot_preview1\" \"fd_write\" (func $fd_write (param i32 i32 i32 i32) (result i32)))\n");
+    fprintf(out, "  (import \"wasi_snapshot_preview1\" \"proc_exit\" (func $proc_exit (param i32)))\n");
 
     // emcc-compatible inline stdlib
 

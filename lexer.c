@@ -44,6 +44,9 @@ static TokenType kw_lookup(const char *s, int len) {
             if (s[0] == 'n' && s[1] == 'o' && s[2] == 't') return TOK_NOT;
             if (s[0] == 'a' && s[1] == 'n' && s[2] == 'd') return TOK_AND;
             if (s[0] == 'l' && s[1] == 'e' && s[2] == 'n') return TOK_LEN;
+            if (s[0] == 'h' && s[1] == 'i' && s[2] == 'n') return TOK_HINT;
+            if (s[0] == 'e' && s[1] == 'n' && s[2] == 'u') return TOK_ENUM;
+            if (s[0] == 'm' && s[1] == 'a' && s[2] == 't') return TOK_MATCH;
             break;
         case 4:
             if (s[0] == 'e' && s[1] == 'l' && s[2] == 's' && s[3] == 'e') return TOK_ELSE;
@@ -54,6 +57,7 @@ static TokenType kw_lookup(const char *s, int len) {
             if (s[0] == 'w' && s[1] == 'h' && s[2] == 'i' && s[3] == 'l' && s[4] == 'e') return TOK_WHILE;
             if (s[0] == 'f' && s[1] == 'a' && s[2] == 'l' && s[3] == 's' && s[4] == 'e') return TOK_FALSE;
             if (s[0] == 'p' && s[1] == 'r' && s[2] == 'i' && s[3] == 'n' && s[4] == 't') return TOK_PRINT;
+            if (s[0] == 't' && s[1] == 'y' && s[2] == 'p' && s[3] == 'e' && s[4] == 's') return TOK_TYPE;
             break;
         case 6:
             if (s[0] == 'r' && s[1] == 'e' && s[2] == 't' && s[3] == 'u' && s[4] == 'r' && s[5] == 'n') return TOK_RETURN;
@@ -119,10 +123,19 @@ Token lexer_next(Lexer *lex) {
         case '[': tok.type = TOK_LBRACKET; break;
         case ']': tok.type = TOK_RBRACKET; break;
         case ',': tok.type = TOK_COMMA; break;
-        case ':': tok.type = TOK_COLON; break;
+        case ':': 
+            if (lex->src[lex->pos] == ':') { lex->pos++; tok.type = TOK_COLONCOLON; }
+            else tok.type = TOK_COLON;
+            break;
+        case '@': tok.type = TOK_AT; break;
         case ';': tok.type = TOK_SEMI; break;
+        case '|': tok.type = TOK_PIPE; break;
         case '+': tok.type = TOK_PLUS; break;
-        case '-': tok.type = TOK_MINUS; break;
+        case '-':
+            if (lex->src[lex->pos] == '>') { lex->pos++; tok.type = TOK_ARROW; }
+            else tok.type = TOK_MINUS;
+            break;
+        case '~': tok.type = TOK_TILDE; break;
         case '*': tok.type = TOK_STAR; break;
         case '/': tok.type = TOK_SLASH; break;
         case '%': tok.type = TOK_PERCENT; break;

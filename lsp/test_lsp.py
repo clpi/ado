@@ -5,32 +5,32 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from lsp import do_lsp
+    from lsp import ado_lsp
 except ImportError:
     pass
 
 class TestLSP(unittest.TestCase):
     def test_parse(self):
         # We can't easily test without mock, but just creating the instance works as a smoke test
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         server.parse_symbols("file:///test.do", "fn main() {\n  let a = 1\n}")
         self.assertIn("main", server.symbols)
         self.assertIn("a", server.symbols)
 
     def test_missing_let_assignment(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         server.parse_symbols("file:///test.do", "fn main() {\n  let a\n}")
         diags = server.get_diagnostics("file:///test.do", "fn main() {\n  let a\n}")
         self.assertTrue(any(d['message'] == 'let statement requires assignment' for d in diags))
 
     def test_undefined_function(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         server.parse_symbols("file:///test.do", "fn main() {\n  foo()\n}")
         diags = server.get_diagnostics("file:///test.do", "fn main() {\n  foo()\n}")
         self.assertTrue(any('Undefined function: foo' in d['message'] for d in diags))
 
     def test_semantic_tokens(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         server.docs["file:///test.do"] = "fn main() {\n  let a = 1\n}"
         server.parse_symbols("file:///test.do", server.docs["file:///test.do"])
         msg = {'params': {'textDocument': {'uri': 'file:///test.do'}}}
@@ -39,7 +39,7 @@ class TestLSP(unittest.TestCase):
         self.assertTrue(len(result['data']) > 0)
 
     def test_inlay_hints(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         text = "fn add(a, b) {}\nfn main() {\n  add(1, 2)\n}"
         server.docs["file:///test.do"] = text
         server.parse_symbols("file:///test.do", text)
@@ -48,7 +48,7 @@ class TestLSP(unittest.TestCase):
         self.assertTrue(any('a:' in h['label'] for h in hints))
 
     def test_document_highlight(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         text = "fn main() {\n  let a = 1\n  print(a)\n}"
         server.docs["file:///test.do"] = text
         server.parse_symbols("file:///test.do", text)
@@ -57,14 +57,14 @@ class TestLSP(unittest.TestCase):
         self.assertEqual(len(highlights), 2)
 
     def test_code_action(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         diag = {'message': 'let statement requires assignment', 'range': {'end': {'line': 1, 'character': 7}}}
         msg = {'params': {'textDocument': {'uri': 'file:///test.do'}, 'context': {'diagnostics': [diag]}}}
         actions = server.handle_code_action(msg)
         self.assertTrue(any(a['title'] == 'Initialize variable' for a in actions))
 
     def test_folding_range(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         text = "fn main() {\n  let a = 1\n}"
         server.docs["file:///test.do"] = text
         msg = {'params': {'textDocument': {'uri': 'file:///test.do'}}}
@@ -74,7 +74,7 @@ class TestLSP(unittest.TestCase):
         self.assertEqual(folds[0]['endLine'], 2)
 
     def test_call_hierarchy(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         text = "fn foo() {}\nfn main() {\n  foo()\n}"
         server.docs["file:///test.do"] = text
         server.parse_symbols("file:///test.do", text)
@@ -98,14 +98,14 @@ class TestLSP(unittest.TestCase):
         self.assertTrue(any(o['to']['name'] == 'foo' for o in outgoing))
 
     def test_initialize(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         result = server.handle_initialize({})
         self.assertIn('capabilities', result)
         self.assertTrue(result['capabilities']['completionProvider'])
         self.assertTrue(result['capabilities']['definitionProvider'])
 
     def test_completion(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         uri = "file:///test.do"
         server.docs[uri] = "fn myfunc(a, b) {\n  let myvar = 1\n}"
         server.parse_symbols(uri, server.docs[uri])
@@ -119,7 +119,7 @@ class TestLSP(unittest.TestCase):
         self.assertIn('print', labels)
 
     def test_hover(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         uri = "file:///test.do"
         server.docs[uri] = "fn myfunc(a, b) {\n  let myvar = 1\n}\nmyfunc(1, 2)"
         server.parse_symbols(uri, server.docs[uri])
@@ -130,7 +130,7 @@ class TestLSP(unittest.TestCase):
         self.assertIn("fn myfunc(a, b)", result['contents']['value'])
 
     def test_definition(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         uri = "file:///test.do"
         server.docs[uri] = "fn myfunc(a, b) {\n  let myvar = 1\n}\nmyfunc(1, 2)"
         server.parse_symbols(uri, server.docs[uri])
@@ -143,7 +143,7 @@ class TestLSP(unittest.TestCase):
         self.assertEqual(result[0]['range']['start']['line'], 0)
 
     def test_references(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         uri = "file:///test.do"
         server.docs[uri] = "fn myfunc(a, b) {\n  let myvar = 1\n}\nmyfunc(1, 2)\nmyfunc(3, 4)"
         server.parse_symbols(uri, server.docs[uri])
@@ -153,7 +153,7 @@ class TestLSP(unittest.TestCase):
         self.assertEqual(len(result), 3)  # Definition + 2 usages
 
     def test_rename(self):
-        server = do_lsp.AdoLSP()
+        server = ado_lsp.AdoLSP()
         uri = "file:///test.do"
         server.docs[uri] = "fn myfunc(a, b) {\n  let myvar = 1\n}\nmyfunc(1, 2)\nmyfunc(3, 4)"
         server.parse_symbols(uri, server.docs[uri])

@@ -7,7 +7,7 @@ This file provides context and guidelines for automated agents working on the Ad
 Ado (file extension `.do`) is a minimal, fast programming language that compiles down to optimized C code (using `-O1`).
 
 - **Compiler Binary:** Built as `doc` via `make` and installed as `ado` via `make install`.
-- **LSP Implementation:** A Python-based Language Server Protocol implementation is available in `lsp/do_lsp.py`. Test it via `pytest lsp/test_lsp.py` or `python3 lsp/test_lsp.py`.
+- **LSP Implementation:** A Python-based Language Server Protocol implementation is available in `lsp/ado_lsp.py`. Test it via `pytest lsp/test_lsp.py` or `python3 lsp/test_lsp.py`.
 - **Tree-sitter Grammar:** The `tree-sitter-do/` directory contains the Tree-sitter grammar. It can be compiled by running `tree-sitter generate` inside that directory.
 - **IDE Support:** Use the `./do-edit` helper script to launch Neovim with full IDE capabilities (LSP, Tree-sitter) for `.do` files.
 
