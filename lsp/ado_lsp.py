@@ -36,6 +36,7 @@ class AdoLSP:
     def __init__(self):
         self.docs: Dict[str, str] = {}
         self.symbols: Dict[str, List[Symbol]] = {}
+        self.symbols_by_uri: Dict[str, List[Symbol]] = {}
         self.keywords = ['fn', 'let', 'if', 'else', 'while', 'for', 'return', 'in',
                          'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push',
                          'hint', 'type', 'inline', 'const', 'static']
@@ -67,6 +68,16 @@ class AdoLSP:
     def parse_symbols(self, uri: str, text: str):
         masked_text = self._mask_text(text)
         symbols = []
+
+        # Clean up old symbols for this URI
+        old_symbols = self.symbols_by_uri.get(uri, [])
+        for old_sym in old_symbols:
+            if old_sym.name in self.symbols:
+                self.symbols[old_sym.name] = [s for s in self.symbols[old_sym.name] if s.uri != uri]
+                if not self.symbols[old_sym.name]:
+                    del self.symbols[old_sym.name]
+        self.symbols_by_uri[uri] = []
+
         lines = text.split('\n')
         masked_lines = masked_text.split('\n')
         fn_pattern = re.compile(r'fn\s+(\w+)\s*\(([^)]*)\)')
@@ -204,8 +215,8 @@ class AdoLSP:
 
         for sym in symbols:
             if sym.name not in self.symbols: self.symbols[sym.name] = []
-            self.symbols[sym.name] = [s for s in self.symbols[sym.name] if s.uri != uri]
             self.symbols[sym.name].append(sym)
+            self.symbols_by_uri[uri].append(sym)
     def get_diagnostics(self, uri: str, text: str) -> List[dict]:
         diagnostics = []
         masked_text = self._mask_text(text)
@@ -678,20 +689,18 @@ class AdoLSP:
     def handle_document_symbols(self, msg: dict) -> list:
         uri = msg['params']['textDocument']['uri']
         symbols = []
-        for name, sym_list in self.symbols.items():
-            for sym in sym_list:
-                if sym.uri == uri:
-                    symbols.append({
-                        'name': name,
-                        'kind': 12 if sym.kind == 'function' else 13, # Function or Variable
-                        'location': {
-                            'uri': uri,
-                            'range': {
-                                'start': {'line': sym.line, 'character': sym.col},
-                                'end': {'line': sym.end_line, 'character': sym.end_col}
-                            }
-                        }
-                    })
+        for sym in self.symbols_by_uri.get(uri, []):
+            symbols.append({
+                'name': sym.name,
+                'kind': 12 if sym.kind == 'function' else 13, # Function or Variable
+                'location': {
+                    'uri': uri,
+                    'range': {
+                        'start': {'line': sym.line, 'character': sym.col},
+                        'end': {'line': sym.end_line, 'character': sym.end_col}
+                    }
+                }
+            })
         return symbols
 
     def handle_workspace_symbols(self, msg: dict) -> list:
@@ -904,7 +913,7 @@ class AdoLSP:
         lenses = []
         lines = text.split('\n')
         
-        for i, sym in enumerate([s for s in [sym for syms in self.symbols.values() for sym in syms] if sym.uri == uri]):
+        for i, sym in enumerate(self.symbols_by_uri.get(uri, [])):
             if sym.kind == 'function':
                 # Show function signature as code lens
                 param_hint = f"({', '.join(sym.params)})" if sym.params else "()"
