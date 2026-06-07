@@ -41,28 +41,21 @@ class AdoLSP:
                          'hint', 'type', 'inline', 'const', 'static']
         self.builtins = ['print', 'len', 'push', 'abs', 'min', 'max', 'pow', 'clamp', 'sign', 'is_even', 'is_odd', 'gcd', 'lcm', 'factorial', 'fib', 'sum', 'avg', 'take', 'drop', 'concat', 'fill', 'slice']
 
+    _MASK_RE = re.compile(r'(")((?:[^"\\]|\\.)*)("?)|(#)([^\n]*)')
+
+    def _mask_replacer(self, m) -> str:
+        if m.group(1) is not None:
+            # Replaces string content with spaces, preserving newlines so line numbers don't shift.
+            content = m.group(2)
+            masked_content = '\n'.join(' ' * len(part) for part in content.split('\n'))
+            return m.group(1) + masked_content + m.group(3)
+        else:
+            # Replaces comment content with spaces.
+            return m.group(4) + ' ' * len(m.group(5))
+
     def _mask_text(self, text: str) -> str:
         """Replace contents of string literals and comments with spaces to avoid false positives."""
-        masked = list(text)
-        in_string = False
-        in_comment = False
-        for i, char in enumerate(masked):
-            if in_comment:
-                if char == '\n':
-                    in_comment = False
-                else:
-                    masked[i] = ' '
-            elif in_string:
-                if char == '"':
-                    in_string = False
-                else:
-                    masked[i] = ' '
-            else:
-                if char == '"':
-                    in_string = True
-                elif char == '#':
-                    in_comment = True
-        return "".join(masked)
+        return self._MASK_RE.sub(self._mask_replacer, text)
 
     def parse_symbols(self, uri: str, text: str):
         masked_text = self._mask_text(text)
