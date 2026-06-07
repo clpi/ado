@@ -579,6 +579,7 @@ static void free_ast_unary(AST *ast) {
 }
 
 static void free_ast_call(AST *ast) {
+    free(ast->call.name);
     for (int i = 0; i < ast->call.argc; i++) ast_free_children(ast->call.args[i]);
     free(ast->call.args);
 }
