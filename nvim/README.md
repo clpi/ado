@@ -1,4 +1,4 @@
-# DO Language Editor Setup
+# DO Language Editor Setup (Neovim)
 
 ## Quick Start
 
@@ -18,18 +18,32 @@ This automatically loads:
 ### LSP Keybindings
 
 - `gd` - Go to definition
+- `gD` - Go to type definition
 - `gr` - Find references
 - `K` - Show hover information
+- `<C-k>` - Signature help
 - `<leader>rn` - Rename symbol
 - `<leader>f` - Format document
 - `<leader>ca` - Code actions
+- `<leader>o` - Document symbols
+- `<leader>s` - Workspace symbols
+- `[d` / `]d` - Next/previous diagnostic
 
 ### Tree-sitter
 
 Advanced syntax highlighting and code understanding:
-- Semantic highlighting
+- Semantic highlighting with proper token types
 - Better indentation
 - Code folding support
+- Inlay hints for function parameters
+
+### New Language Features Support
+
+| Feature | Syntax | Highlighting | Completion |
+|---------|--------|--------------|------------|
+| Array Slicing | `arr[2..5]` | `..` operator | Snippet `slice` |
+| List Comprehension | `[for i in 1..10 i * i]` | `for` keyword | Snippet `listcomp` |
+| Destructuring | `let [a, b, ...rest] = arr` | Variable names | Snippet `destruct` |
 
 ## Prerequisites
 
@@ -50,11 +64,28 @@ cd tree-sitter-do
 
 ## Manual Setup
 
-If you prefer to use your own Neovim config, source the DO config:
+If you prefer to use your own Neovim config, copy the files:
 
-```lua
--- In your init.lua
-vim.cmd('source ' .. vim.fn.expand('~/path/to/pl/nvim/init.lua'))
+```bash
+mkdir -p ~/.config/nvim/syntax ~/.config/nvim/ftplugin
+cp vim/syntax/ado.vim ~/.config/nvim/syntax/
+cp vim/ftplugin/ado.vim ~/.config/nvim/ftplugin/
+
+# Add to init.lua
+vim.filetype.add({ extension = { do = 'ado' } })
 ```
 
-Or use it as a reference to integrate into your existing setup.
+For Tree-sitter support, add to your plugin manager config:
+
+```lua
+require('nvim-treesitter.parsers').get_parser_configs().ado = {
+  install_info = { url = '/path/to/ado/tree-sitter-do', files = {'src/parser.c'} },
+  filetype = 'ado',
+}
+```
+
+## Supported Platforms
+
+- **Neovim**: Full LSP + Tree-sitter support
+- **Vim**: Basic syntax highlighting
+- **Helix**: Full support via `helix/` directory

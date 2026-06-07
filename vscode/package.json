@@ -1,0 +1,37 @@
+{
+  "name": "ado-lang",
+  "displayName": "Ado Language",
+  "description": "Syntax highlighting, LSP support, and snippets for the Ado programming language",
+  "version": "1.0.0",
+  "publisher": "poolside",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": [
+    "onLanguage:ado"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ado",
+        "extensions": [".do"],
+        "aliases": ["Ado", "ado"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ado",
+        "scheme": "source.ado",
+        "path": "./syntaxes/ado.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "ado",
+        "path": "./snippets/ado.json"
+      }
+    ]
+  }
+}

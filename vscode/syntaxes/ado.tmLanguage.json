@@ -1,0 +1,60 @@
+{
+  "scopeName": "source.ado",
+  "name": "Ado",
+  "patterns": [
+    {
+      "name": "comment.line.number-sign.ado",
+      "match": "#.*$"
+    },
+    {
+      "name": "keyword.control.ado",
+      "match": "\\b(fn|let|if|else|for|while|return|in)\\b"
+    },
+    {
+      "name": "keyword.operator.ado",
+      "match": "\\.\\.|\\.\\.\\.|==|!=|<=|>=|&&|\\|\\||\\band\\b|\\bor\\b|\\bnot\\b"
+    },
+    {
+      "name": "keyword.control.conditional.ado",
+      "match": "\\b(true|false)\\b"
+    },
+    {
+      "name": "variable.function.ado",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\s*\\("
+    },
+    {
+      "name": "support.function.builtin.ado",
+      "match": "\\b(print|len|push|abs|min|max|pow|clamp|sign|is_even|is_odd|gcd|lcm|factorial|fib|sum|avg|take|drop|concat|fill)\\b"
+    },
+    {
+      "name": "string.quoted.double.ado",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#escaped_characters"
+        }
+      ]
+    },
+    {
+      "name": "constant.numeric.integer.ado",
+      "match": "\\b\\d+\\b"
+    },
+    {
+      "name": "variable.parameter.function.ado",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+    }
+  ],
+  "repository": {
+    "escaped_characters": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.ado",
+          "match": "\\\\."
+        }
+      ]
+    }
+  },
+  "foldingStartMarker": "\\{|\\[",
+  "foldingEndMarker": "\\}|\\]"
+}

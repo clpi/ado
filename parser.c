@@ -214,6 +214,15 @@ static AST *parse_term(Parser *p) {
 
 static AST *parse_arith(Parser *p) {
     AST *left = parse_term(p);
+    /* Range literals: n..m creates array [n, n+1, ..., m] */
+    if (left && left->type == AST_INT && p->cur.type == TOK_DOTDOT) {
+        advance(p);
+        AST *end = parse_expr(p);
+        AST *range = new_ast(p, AST_RANGE);
+        range->range.start = left;
+        range->range.end = end;
+        left = range;
+    }
     while (p->cur.type == TOK_PLUS || p->cur.type == TOK_MINUS) {
         TokenType op = p->cur.type;
         advance(p);
@@ -642,6 +651,14 @@ static void ast_free_children(AST *ast) {
             free(ast->match_stmt.arms);
             break;
         case AST_ENUM:
+            free(ast->enum_def.enum_name);
+            for (int i = 0; i < ast->enum_def.variant_count; i++) free(ast->enum_def.variants[i]);
+            free(ast->enum_def.variants);
+            break;
+        case AST_RANGE:
+            ast_free_children(ast->range.start);
+            ast_free_children(ast->range.end);
+            break;
             free(ast->enum_def.enum_name);
             for (int i = 0; i < ast->enum_def.variant_count; i++) free(ast->enum_def.variants[i]);
             free(ast->enum_def.variants);

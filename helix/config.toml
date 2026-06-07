@@ -1,0 +1,16 @@
+name = "ado"
+scope = "source.ado"
+
+inherits = "do"
+
+comments = ["#"]
+
+# Features that the language implements
+features = [
+  "comment-docstrings",
+  "semicolons",
+]
+
+[[grammar]]
+name = "ado"
+source = { git = "https://github.com/poolside/tree-sitter-do", rev = "main" }

@@ -1,0 +1,57 @@
+{
+  "Array Slice": {
+    "prefix": "slice",
+    "body": "${1:name}[${2:start}..${3:end}]",
+    "description": "Array slice expression"
+  },
+  "List Comprehension": {
+    "prefix": "listcomp",
+    "body": "[for ${1:i} in ${2:start}..${3:end} ${4:expr}]",
+    "description": "List comprehension expression"
+  },
+  "List Comprehension with Filter": {
+    "prefix": "listcompf",
+    "body": "[for ${1:i} in ${2:start}..${3:end} ${4:expr} if ${5:cond}]",
+    "description": "List comprehension with filter"
+  },
+  "Destructuring": {
+    "prefix": "destruct",
+    "body": "let [${1:a}, ${2:b}, ...${3:rest}] = ${4:arr}",
+    "description": "Array destructuring"
+  },
+  "Function": {
+    "prefix": "fn",
+    "body": "fn ${1:name}(${2:params}) {\n  $0\n}",
+    "description": "Function definition"
+  },
+  "Let Statement": {
+    "prefix": "let",
+    "body": "let ${1:name} = ${2:value}",
+    "description": "Let binding"
+  },
+  "If Statement": {
+    "prefix": "if",
+    "body": "if ${1:cond} {\n  ${2:body}\n}$0",
+    "description": "If statement"
+  },
+  "If-Else": {
+    "prefix": "ifelse",
+    "body": "if ${1:cond} {\n  ${2:true}\n} else {\n  ${3:false}\n}$0",
+    "description": "If-else statement"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": "while ${1:cond} {\n  ${2:body}\n}$0",
+    "description": "While loop"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": "for ${1:i} in ${2:start}..${3:end} {\n  ${4:body}\n}$0",
+    "description": "For loop with range"
+  },
+  "Print Statement": {
+    "prefix": "print",
+    "body": "print(${1:values})",
+    "description": "Print statement"
+  }
+}

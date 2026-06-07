@@ -82,6 +82,12 @@ Token lexer_next(Lexer *lex) {
                 val = val * 16 + (ch >= '0' && ch <= '9' ? ch - '0' : (ch >= 'a' && ch <= 'f' ? ch - 'a' + 10 : ch - 'A' + 10));
                 lex->pos++;
             }
+        } else if (lex->src[lex->pos] == '0' && lex->src[lex->pos+1] == 'b') {
+            lex->pos += 2;
+            while (lex->src[lex->pos] == '0' || lex->src[lex->pos] == '1') {
+                val = val * 2 + (lex->src[lex->pos] - '0');
+                lex->pos++;
+            }
         } else {
             while (isdigit(lex->src[lex->pos])) {
                 val = val * 10 + (lex->src[lex->pos] - '0');
@@ -149,7 +155,11 @@ Token lexer_next(Lexer *lex) {
         case '/': tok.type = TOK_SLASH; break;
         case '%': tok.type = TOK_PERCENT; break;
         case '.':
-            if (lex->src[lex->pos] == '.') { lex->pos++; tok.type = TOK_DOTDOT; }
+            if (lex->src[lex->pos] == '.') {
+                lex->pos++;
+                if (lex->src[lex->pos] == '.') { lex->pos++; tok.type = TOK_DOTDOTDOT; }
+                else tok.type = TOK_DOTDOT;
+            }
             break;
         case '=':
             if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_EQ; }

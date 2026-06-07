@@ -8,7 +8,7 @@ typedef enum {
     AST_IF, AST_WHILE, AST_FOR, AST_RETURN, AST_BLOCK, AST_FN,
     AST_ARRAY, AST_INDEX, AST_ASSIGN, AST_PRINT, AST_LEN, AST_PUSH,
     AST_UNARY, AST_TYPE, AST_HINT, AST_MATCH, AST_ENUM, AST_PIPE,
-    AST_SLICE, AST_LISTCOMP, AST_DESTRUCT
+    AST_SLICE, AST_LISTCOMP, AST_DESTRUCT, AST_RANGE
 } ASTType;
 
 typedef struct {
@@ -36,9 +36,10 @@ typedef struct AST {
         struct { char *name; char **params; int paramc; TypeHint **param_hints; struct AST *body; TypeHint *return_hint; } fn;
         struct { struct AST **elems; int count; } array;
         struct { struct AST *arr; struct AST *idx; } index;
+        struct { struct AST *start; struct AST *end; } range;
         struct { struct AST *target; struct AST *val; } assign;
         struct { struct AST **vals; int count; } print;
-struct { struct AST *arr; } len;
+        struct { struct AST *arr; } len;
         struct { struct AST *arr; struct AST *val; } push;
         struct { char *name; struct AST *args; } hint_stmt;
         struct { char *enum_name; struct AST **variants; int variant_count; } enum_def;
