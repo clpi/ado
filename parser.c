@@ -150,11 +150,24 @@ static AST *parse_primary(Parser *p) {
         }
         if (p->cur.type == TOK_LBRACKET) {
             advance(p);
+            AST *idx = parse_expr(p);
+            if (p->cur.type == TOK_DOTDOT) {
+                // This is a slice: arr[start..end]
+                advance(p); // consume first ..
+                AST *ast = new_ast(p, AST_SLICE);
+                ast->slice.arr = new_ast(p, AST_VAR);
+                ast->slice.arr->var_name = name;
+                ast->slice.start = idx;
+                ast->slice.end = parse_expr(p);
+                advance(p); // consume ]
+                return ast;
+            }
+            // Regular index: arr[index]
             AST *ast = new_ast(p, AST_INDEX);
             ast->index.arr = new_ast(p, AST_VAR);
             ast->index.arr->var_name = name;
-            ast->index.idx = parse_expr(p);
-            advance(p);
+            ast->index.idx = idx;
+            advance(p); // consume ]
             return ast;
         }
         AST *ast = new_ast(p, AST_VAR);
@@ -215,15 +228,29 @@ static AST *parse_arith(Parser *p) {
 
 static AST *parse_expr(Parser *p) {
     AST *left = parse_arith(p);
+    /* Chained comparisons: a < b < c becomes a < b && b < c */
+    AST *chain_left = left;
+    AST *chain_result = NULL;
     while (p->cur.type >= TOK_EQ && p->cur.type <= TOK_GE) {
         TokenType op = p->cur.type;
         advance(p);
-        AST *ast = new_ast(p, AST_BINOP);
-        ast->binop.left = left;
-        ast->binop.op = op;
-        ast->binop.right = parse_arith(p);
-        left = ast;
+        AST *mid = parse_arith(p);
+        AST *cmp = new_ast(p, AST_BINOP);
+        cmp->binop.left = chain_left;
+        cmp->binop.op = op;
+        cmp->binop.right = mid;
+        if (chain_result) {
+            AST *chain = new_ast(p, AST_BINOP);
+            chain->binop.left = chain_result;
+            chain->binop.op = TOK_AND;
+            chain->binop.right = cmp;
+            chain_result = chain;
+        } else {
+            chain_result = cmp;
+        }
+        chain_left = mid;
     }
+    if (chain_result) left = chain_result;
     while (p->cur.type == TOK_AND || p->cur.type == TOK_OR || p->cur.type == TOK_PIPE) {
         TokenType op = p->cur.type;
         advance(p);

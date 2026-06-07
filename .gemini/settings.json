@@ -1,0 +1,12 @@
+{
+  "skills": {
+    "disabled": [
+      "moshi-best-practices"
+    ]
+  },
+  "hooksConfig": {
+    "disabled": [
+      "Moshi"
+    ]
+  }
+}

@@ -4,6 +4,9 @@
 "if" @keyword.control
 "else" @keyword.control
 "return" @keyword.control
+"for" @keyword.control
+"while" @keyword.control
+"in" @keyword.control.conditional
 
 ; Functions
 (function_declaration name: (identifier) @function)
@@ -14,14 +17,18 @@
 
 ; Variables
 (let_statement name: (identifier) @variable)
+(destructure_statement (identifier) @variable)
 
 ; Operators
 ["+" "-" "*" "/" "==" "!=" "<" ">" "<=" ">="] @operator
 "=" @operator
+".." @operator
 
 ; Literals
 (number) @number
+(string) @string
 
 ; Punctuation
-["(" ")" "{" "}"] @punctuation.bracket
+["(" ")" "{" "}" "[" "]"] @punctuation.bracket
 "," @punctuation.delimiter
+"..." @punctuation.special

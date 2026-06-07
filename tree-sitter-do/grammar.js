@@ -7,7 +7,10 @@ module.exports = grammar({
     _statement: $ => choice(
       $.function_declaration,
       $.let_statement,
+      $.destructure_statement,
       $.if_statement,
+      $.for_statement,
+      $.while_statement,
       $.return_statement,
       $.expression_statement
     ),
@@ -32,6 +35,19 @@ module.exports = grammar({
     let_statement: $ => seq(
       'let',
       field('name', $.identifier),
+      '=',
+      field('value', $._expression)
+    ),
+
+    destructure_statement: $ => seq(
+      'let',
+      '[',
+      field('names', sep1($.identifier, ',')),
+      optional(seq(
+        '...',
+        field('rest', $.identifier)
+      )),
+      ']',
       '=',
       field('value', $._expression)
     ),
@@ -67,10 +83,13 @@ module.exports = grammar({
     expression_statement: $ => $._expression,
 
     _expression: $ => choice(
+      $.list_comprehension,
       $.binary_expression,
       $.call_expression,
       $.identifier,
-      $.number
+      $.number,
+      $.string,
+      $.array_expression
     ),
 
     binary_expression: $ => choice(
@@ -99,12 +118,34 @@ module.exports = grammar({
       ']'
     ),
 
-    index_expression: $ => seq(
+    list_comprehension: $ => seq(
+      '[',
+      'for',
+      field('var', $.identifier),
+      'in',
+      field('start', $._expression),
+      '..',
+      field('end', $._expression),
+      field('body', $._expression),
+      optional(seq('if', field('filter', $._expression))),
+      ']'
+    ),
+
+    index_expression: $ => prec(2, seq(
       field('array', $._expression),
       '[',
       field('index', $._expression),
       ']'
-    )
+    )),
+
+    slice_expression: $ => prec(2, seq(
+      field('array', $._expression),
+      '[',
+      field('start', $._expression),
+      '..',
+      field('end', $._expression),
+      ']'
+    ))
   }
 });
 

@@ -164,5 +164,36 @@ class TestLSP(unittest.TestCase):
         self.assertIn(uri, result['changes'])
         self.assertEqual(len(result['changes'][uri]), 3)
 
+    def test_destructure_symbols(self):
+        server = ado_lsp.AdoLSP()
+        server.parse_symbols("file:///test.do", "let [a, b, ...rest] = [1, 2, 3]")
+        self.assertIn("a", server.symbols)
+        self.assertIn("b", server.symbols)
+        self.assertIn("rest", server.symbols)
+
+    def test_slice_completion(self):
+        server = ado_lsp.AdoLSP()
+        uri = "file:///test.do"
+        server.docs[uri] = "let x = "
+        result = server.handle_completion({'params': {'textDocument': {'uri': uri}}})
+        labels = [item['label'] for item in result['items']]
+        self.assertIn('slice', labels)
+
+    def test_listcomp_completion(self):
+        server = ado_lsp.AdoLSP()
+        uri = "file:///test.do"
+        server.docs[uri] = "let x = "
+        result = server.handle_completion({'params': {'textDocument': {'uri': uri}}})
+        labels = [item['label'] for item in result['items']]
+        self.assertIn('listcomp', labels)
+
+    def test_destruct_completion(self):
+        server = ado_lsp.AdoLSP()
+        uri = "file:///test.do"
+        server.docs[uri] = "let x = "
+        result = server.handle_completion({'params': {'textDocument': {'uri': uri}}})
+        labels = [item['label'] for item in result['items']]
+        self.assertIn('destruct', labels)
+
 if __name__ == '__main__':
     unittest.main()

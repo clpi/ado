@@ -75,9 +75,18 @@ Token lexer_next(Lexer *lex) {
     
     if (isdigit(c)) {
         int val = 0;
-        while (isdigit(lex->src[lex->pos])) {
-            val = val * 10 + (lex->src[lex->pos] - '0');
-            lex->pos++;
+        if (lex->src[lex->pos] == '0' && lex->src[lex->pos+1] == 'x') {
+            lex->pos += 2;
+            while (isxdigit(lex->src[lex->pos])) {
+                char ch = lex->src[lex->pos];
+                val = val * 16 + (ch >= '0' && ch <= '9' ? ch - '0' : (ch >= 'a' && ch <= 'f' ? ch - 'a' + 10 : ch - 'A' + 10));
+                lex->pos++;
+            }
+        } else {
+            while (isdigit(lex->src[lex->pos])) {
+                val = val * 10 + (lex->src[lex->pos] - '0');
+                lex->pos++;
+            }
         }
         tok.int_val = val;
         tok.type = TOK_INT;

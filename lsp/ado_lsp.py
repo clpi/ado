@@ -36,10 +36,10 @@ class AdoLSP:
     def __init__(self):
         self.docs: Dict[str, str] = {}
         self.symbols: Dict[str, List[Symbol]] = {}
-        self.keywords = ['fn', 'let', 'if', 'else', 'while', 'for', 'return',
+        self.keywords = ['fn', 'let', 'if', 'else', 'while', 'for', 'return', 'in',
                          'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push',
                          'hint', 'type', 'inline', 'const', 'static']
-        self.builtins = ['print', 'len', 'push']
+        self.builtins = ['print', 'len', 'push', 'push', 'abs', 'min', 'max', 'pow']
 
     def _mask_text(self, text: str) -> str:
         """Replace contents of string literals and comments with spaces to avoid false positives."""
@@ -176,6 +176,31 @@ class AdoLSP:
                     'symbol': v_sym,
                     'brace_count': brace_count
                 })
+
+            # Destructuring: let [a, b, ...rest] = arr
+            destruct_pattern = re.compile(r'let\s*\[\s*([^]]*)\]')
+            destruct_match = destruct_pattern.search(masked_line)
+            if destruct_match:
+                names_str = destruct_match.group(1)
+                # Parse names and ...rest
+                parts = [p.strip() for p in names_str.split(',')]
+                for part in parts:
+                    if '...' in part:
+                        # ...rest pattern
+                        rest_name = part.replace('...', '').strip()
+                        if rest_name:
+                            d_sym = Symbol(name=rest_name, kind='variable', uri=uri,
+                                line=i, col=destruct_match.start() + 5 + names_str.find(rest_name), 
+                                end_line=i, end_col=destruct_match.start() + 5 + names_str.find(rest_name) + len(rest_name),
+                                scope_start_line=i, scope_start_col=destruct_match.end() + 1)
+                            symbols.append(d_sym)
+                    elif part:
+                        # Regular name
+                        d_sym = Symbol(name=part, kind='variable', uri=uri,
+                            line=i, col=destruct_match.start() + 5 + names_str.find(part),
+                            end_line=i, end_col=destruct_match.start() + 5 + names_str.find(part) + len(part),
+                            scope_start_line=i, scope_start_col=destruct_match.end() + 1)
+                        symbols.append(d_sym)
 
         for sym in symbols:
             if sym.name not in self.symbols: self.symbols[sym.name] = []
@@ -833,8 +858,32 @@ class AdoLSP:
         return folds
 
     def handle_code_lens(self, msg: dict) -> list:
-        # Minimal empty implementation for now
-        return []
+        uri = msg['params']['textDocument']['uri']
+        text = self.docs.get(uri, '')
+        if not text:
+            return []
+        
+        lenses = []
+        lines = text.split('\n')
+        
+        for i, sym in enumerate([s for s in [sym for syms in self.symbols.values() for sym in syms] if sym.uri == uri]):
+            if sym.kind == 'function':
+                # Show function signature as code lens
+                param_hint = f"({', '.join(sym.params)})" if sym.params else "()"
+                lenses.append({
+                    'range': {
+                        'start': {'line': sym.line, 'character': 0},
+                        'end': {'line': sym.line, 'character': len(lines[sym.line]) if sym.line < len(lines) else 0}
+                    },
+                    'code': f"fn {sym.name}{param_hint}",
+                    'command': {
+                        'title': f"▶ Run function",
+                        'command': "ado.runFunction",
+                        'arguments': [sym.name]
+                    }
+                })
+        
+        return lenses
 
     def handle_completion(self, msg: dict) -> dict:
         uri = msg['params']['textDocument']['uri']
@@ -847,6 +896,31 @@ class AdoLSP:
                 'kind': 14, # Keyword
                 'detail': 'keyword'
             })
+
+        # Add special syntax snippets
+        items.append({
+            'label': 'slice',
+            'kind': 14,
+            'detail': 'array slice syntax',
+            'insertText': 'arr[${1:start}..${2:end}]',
+            'insertTextFormat': 2  # Snippet
+        })
+        
+        items.append({
+            'label': 'listcomp',
+            'kind': 14,
+            'detail': 'list comprehension',
+            'insertText': '[for ${1:i} in ${2:start}..${3:end} ${4:expr}]',
+            'insertTextFormat': 2  # Snippet
+        })
+        
+        items.append({
+            'label': 'destruct',
+            'kind': 14,
+            'detail': 'destructuring',
+            'insertText': 'let [${1:a}, ${2:b}, ...${3:rest}] = ${4:arr}',
+            'insertTextFormat': 2  # Snippet
+        })
 
         # Add symbols
         for name, sym_list in self.symbols.items():
@@ -973,6 +1047,19 @@ class AdoLSP:
                 for match in re.finditer(r'\b' + re.escape(kw) + r'\b', line):
                     tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
 
+            # Find special operators: .. and ...
+            for match in re.finditer(r'\.\.', line):
+                tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
+            for match in re.finditer(r'\.\.\.', line):
+                tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
+
+            # Find list comprehension pattern
+            listcomp_match = re.search(r'\[\s*for\s+\w+\s+in', line)
+            if listcomp_match:
+                # Highlight the whole list comprehension
+                for match in re.finditer(r'\[', line):
+                    tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
+            
             # Find symbols
             for sym_name, sym_list in self.symbols.items():
                 if sym_name in self.keywords: continue
