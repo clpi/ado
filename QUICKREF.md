@@ -32,6 +32,41 @@ if x > 0 {
 # Single line comment
 ```
 
+## Rare but Useful Features
+
+### Safe Indexing
+```
+arr?idx
+arr?idx:fallback
+```
+
+### Negative Branching
+```
+unless condition {
+  # runs when condition is false
+} else {
+  # runs when condition is true
+}
+```
+
+### Swap
+```
+swap a, b
+```
+
+### Assertions and Infinite Loops
+```
+assert n > 0
+forever {
+  if done {
+    break
+  }
+  if skip {
+    continue
+  }
+}
+```
+
 ## Operators
 
 ### Arithmetic

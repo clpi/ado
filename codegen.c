@@ -5,6 +5,9 @@
 
 static void gen_expr(AST *ast, FILE *out);
 
+static int ado_temp_counter = 0;
+static int next_temp(void) { return ado_temp_counter++; }
+
 static void gen_str_escape(const char *s, FILE *out) {
     while (*s) {
         switch (*s) {
@@ -95,6 +98,18 @@ static void gen_expr(AST *ast, FILE *out) {
             gen_expr(ast->index.idx, out);
             fprintf(out, "]");
             break;
+        case AST_SAFE_INDEX: {
+            int n = next_temp();
+            fprintf(out, "({ AdoArray _ado_safe_%d=", n);
+            gen_expr(ast->safe_index.arr, out);
+            fprintf(out, "; int _ado_idx_%d=", n);
+            gen_expr(ast->safe_index.idx, out);
+            fprintf(out, "; int _ado_fallback_%d=", n);
+            if (ast->safe_index.fallback) gen_expr(ast->safe_index.fallback, out);
+            else fprintf(out, "0");
+            fprintf(out, "; _ado_idx_%d>=0&&_ado_idx_%d<_ado_safe_%d.len?_ado_safe_%d.data[_ado_idx_%d]:_ado_fallback_%d; })", n, n, n, n, n, n);
+            break;
+        }
         case AST_SLICE:
             // Create a compound literal for the slice array
             // ado_slice creates a new array with elements from arr[start..end] (exclusive)
@@ -149,7 +164,8 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             break;
         case AST_IF:
             gen_indent(out, indent);
-            fprintf(out, "if(");
+            if (ast->if_stmt.invert_cond) fprintf(out, "if(!(");
+            else fprintf(out, "if(");
             gen_expr(ast->if_stmt.cond, out);
             fprintf(out, "){\n");
             gen_block(ast->if_stmt.then, out, indent + 1);
@@ -182,6 +198,21 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             gen_block(ast->for_stmt.body, out, indent + 1);
             gen_indent(out, indent);
             fprintf(out, "}\n");
+            break;
+        case AST_FOREVER:
+            gen_indent(out, indent);
+            fprintf(out, "while(1){\n");
+            gen_block(ast->forever.body, out, indent + 1);
+            gen_indent(out, indent);
+            fprintf(out, "}\n");
+            break;
+        case AST_BREAK:
+            gen_indent(out, indent);
+            fprintf(out, "break;\n");
+            break;
+        case AST_CONTINUE:
+            gen_indent(out, indent);
+            fprintf(out, "continue;\n");
             break;
         case AST_RETURN:
             gen_indent(out, indent);
@@ -229,6 +260,28 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             fprintf(out, ",");
             gen_expr(ast->push.val, out);
             fprintf(out, ");\n");
+            break;
+        }
+        case AST_ASSERT:
+            gen_indent(out, indent);
+            fprintf(out, "if(!(");
+            gen_expr(ast->assert_stmt.expr, out);
+            fprintf(out, ")){fprintf(stderr,\"Ado assertion failed\");exit(1);}\n");
+            break;
+        case AST_SWAP: {
+            int n = next_temp();
+            gen_indent(out, indent);
+            fprintf(out, "__auto_type _ado_swap_%d=", n);
+            gen_expr(ast->swap.left, out);
+            fprintf(out, ";\n");
+            gen_indent(out, indent);
+            gen_expr(ast->swap.left, out);
+            fprintf(out, "=");
+            gen_expr(ast->swap.right, out);
+            fprintf(out, ";\n");
+            gen_indent(out, indent);
+            gen_expr(ast->swap.right, out);
+            fprintf(out, "=_ado_swap_%d;\n", n);
             break;
         }
         case AST_ASSIGN:

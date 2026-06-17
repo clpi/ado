@@ -53,5 +53,30 @@
     "prefix": "print",
     "body": "print(${1:values})",
     "description": "Print statement"
+  },
+  "Unless Statement": {
+    "prefix": "unless",
+    "body": "unless ${1:cond} {\n  ${2:body}\n}$0",
+    "description": "Negative branch statement"
+  },
+  "Forever Loop": {
+    "prefix": "forever",
+    "body": "forever {\n  ${1:body}\n}",
+    "description": "Infinite loop"
+  },
+  "Swap": {
+    "prefix": "swap",
+    "body": "swap ${1:a}, ${2:b}",
+    "description": "Parallel swap statement"
+  },
+  "Assert": {
+    "prefix": "assert",
+    "body": "assert ${1:expr}",
+    "description": "Runtime assertion"
+  },
+  "Safe Index": {
+    "prefix": "safeindex",
+    "body": "${1:arr}?${2:idx}:${3:fallback}",
+    "description": "Safe array indexing with fallback"
   }
 }

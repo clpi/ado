@@ -37,9 +37,10 @@ class AdoLSP:
         self.docs: Dict[str, str] = {}
         self.symbols: Dict[str, List[Symbol]] = {}
         self.symbols_by_uri: Dict[str, List[Symbol]] = {}
-        self.keywords = ['fn', 'let', 'if', 'else', 'while', 'for', 'return', 'in',
+        self.keywords = ['fn', 'let', 'if', 'unless', 'else', 'while', 'forever', 'for', 'return', 'in',
                          'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push',
-                         'hint', 'type', 'inline', 'const', 'static']
+                         'hint', 'type', 'inline', 'const', 'static', 'break', 'continue',
+                         'assert', 'swap']
         self.builtins = ['print', 'len', 'push', 'abs', 'min', 'max', 'pow', 'clamp', 'sign', 'is_even', 'is_odd', 'gcd', 'lcm', 'factorial', 'fib', 'sum', 'avg', 'take', 'drop', 'concat', 'fill', 'slice']
 
     _MASK_RE = re.compile(r'(")((?:[^"\\]|\\.)*)("?)|(#)([^\n]*)')
@@ -962,6 +963,46 @@ class AdoLSP:
             'insertTextFormat': 2  # Snippet
         })
 
+        items.append({
+            'label': 'safe_index',
+            'kind': 14,
+            'detail': 'safe array indexing with fallback',
+            'insertText': '${1:arr}?${2:idx}:${3:fallback}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'swap',
+            'kind': 14,
+            'detail': 'parallel swap statement',
+            'insertText': 'swap ${1:a}, ${2:b}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'unless',
+            'kind': 14,
+            'detail': 'negative branch',
+            'insertText': 'unless ${1:condition} {\n  ${2:body}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'forever',
+            'kind': 14,
+            'detail': 'infinite loop',
+            'insertText': 'forever {\n  ${1:body}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'assert',
+            'kind': 14,
+            'detail': 'runtime assertion',
+            'insertText': 'assert ${1:expr}',
+            'insertTextFormat': 2
+        })
+
         # Add symbols
         for name, sym_list in self.symbols.items():
             sym = sym_list[0]
@@ -1091,10 +1132,12 @@ class AdoLSP:
                 for match in re.finditer(r'\b' + re.escape(kw) + r'\b', line):
                     tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
 
-            # Find special operators: .. and ...
+            # Find special operators: .., ... and safe-index ?
             for match in re.finditer(r'\.\.', line):
                 tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
             for match in re.finditer(r'\.\.\.', line):
+                tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
+            for match in re.finditer(r'\?', line):
                 tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
 
             # Find list comprehension pattern

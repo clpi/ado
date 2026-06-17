@@ -57,10 +57,19 @@ static TokenType kw_lookup(const char *s, int len) {
             if (s[0] == 'w' && s[1] == 'h' && s[2] == 'i' && s[3] == 'l' && s[4] == 'e') return TOK_WHILE;
             if (s[0] == 'f' && s[1] == 'a' && s[2] == 'l' && s[3] == 's' && s[4] == 'e') return TOK_FALSE;
             if (s[0] == 'p' && s[1] == 'r' && s[2] == 'i' && s[3] == 'n' && s[4] == 't') return TOK_PRINT;
+            if (s[0] == 'b' && s[1] == 'r' && s[2] == 'e' && s[3] == 'a' && s[4] == 'k') return TOK_BREAK;
             if (s[0] == 't' && s[1] == 'y' && s[2] == 'p' && s[3] == 'e' && s[4] == 's') return TOK_TYPE;
             break;
         case 6:
             if (s[0] == 'r' && s[1] == 'e' && s[2] == 't' && s[3] == 'u' && s[4] == 'r' && s[5] == 'n') return TOK_RETURN;
+            if (s[0] == 'a' && s[1] == 's' && s[2] == 's' && s[3] == 'e' && s[4] == 'r' && s[5] == 't') return TOK_ASSERT;
+            if (s[0] == 'u' && s[1] == 'n' && s[2] == 'l' && s[3] == 'e' && s[4] == 's' && s[5] == 's') return TOK_UNLESS;
+            break;
+        case 7:
+            if (s[0] == 'f' && s[1] == 'o' && s[2] == 'r' && s[3] == 'e' && s[4] == 'v' && s[5] == 'e' && s[6] == 'r') return TOK_FOREVER;
+            break;
+        case 8:
+            if (s[0] == 'c' && s[1] == 'o' && s[2] == 'n' && s[3] == 't' && s[4] == 'i' && s[5] == 'n' && s[6] == 'u' && s[7] == 'e') return TOK_CONTINUE;
             break;
     }
     return TOK_IDENT;
@@ -145,6 +154,7 @@ Token lexer_next(Lexer *lex) {
         case '@': tok.type = TOK_AT; break;
         case ';': tok.type = TOK_SEMI; break;
         case '|': tok.type = TOK_PIPE; break;
+        case '?': tok.type = TOK_QMARK; break;
         case '+': tok.type = TOK_PLUS; break;
         case '-':
             if (lex->src[lex->pos] == '>') { lex->pos++; tok.type = TOK_ARROW; }

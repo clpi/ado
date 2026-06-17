@@ -41,6 +41,7 @@ static AST *new_ast(Parser *p, ASTType type) {
     AST *ast = &p->pool[p->pool_count++];
     memset(ast, 0, sizeof(AST));
     ast->type = type;
+    ast->line = p->cur.line;
     return ast;
 }
 
@@ -126,6 +127,19 @@ static AST *parse_primary(Parser *p) {
     if (p->cur.type == TOK_IDENT) {
         char *name = p->cur.value;
         advance(p);
+        if (p->cur.type == TOK_QMARK) {
+            advance(p);
+            AST *ast = new_ast(p, AST_SAFE_INDEX);
+            ast->safe_index.arr = new_ast(p, AST_VAR);
+            ast->safe_index.arr->var_name = name;
+            ast->safe_index.idx = parse_expr(p);
+            ast->safe_index.fallback = NULL;
+            if (p->cur.type == TOK_COLON) {
+                advance(p);
+                ast->safe_index.fallback = parse_expr(p);
+            }
+            return ast;
+        }
         if (p->cur.type == TOK_LPAREN) {
             advance(p);
             AST *ast = new_ast(p, AST_CALL);
@@ -313,6 +327,47 @@ static AST *parse_stmt(Parser *p) {
         }
         return ast;
     }
+    if (p->cur.type == TOK_UNLESS) {
+        advance(p);
+        AST *ast = new_ast(p, AST_IF);
+        ast->if_stmt.cond = parse_expr(p);
+        ast->if_stmt.then = parse_block(p);
+        ast->if_stmt.els = NULL;
+        ast->if_stmt.invert_cond = 1;
+        if (p->cur.type == TOK_ELSE) {
+            advance(p);
+            ast->if_stmt.els = parse_block(p);
+        }
+        return ast;
+    }
+    if (p->cur.type == TOK_ASSERT) {
+        advance(p);
+        AST *ast = new_ast(p, AST_ASSERT);
+        ast->assert_stmt.expr = parse_expr(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_SWAP) {
+        advance(p);
+        AST *ast = new_ast(p, AST_SWAP);
+        ast->swap.left = parse_expr(p);
+        if (p->cur.type == TOK_COMMA) advance(p);
+        ast->swap.right = parse_expr(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_FOREVER) {
+        advance(p);
+        AST *ast = new_ast(p, AST_FOREVER);
+        ast->forever.body = parse_block(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_BREAK) {
+        advance(p);
+        return new_ast(p, AST_BREAK);
+    }
+    if (p->cur.type == TOK_CONTINUE) {
+        advance(p);
+        return new_ast(p, AST_CONTINUE);
+    }
     if (p->cur.type == TOK_IDENT) {
         char *saved_name = p->cur.value;
         Parser saved_parser = *p;
@@ -403,6 +458,7 @@ static AST *parse_stmt(Parser *p) {
         ast->if_stmt.cond = parse_expr(p);
         ast->if_stmt.then = parse_block(p);
         ast->if_stmt.els = NULL;
+        ast->if_stmt.invert_cond = 0;
         if (p->cur.type == TOK_ELSE) {
             advance(p);
             ast->if_stmt.els = parse_block(p);
@@ -630,6 +686,7 @@ static void ast_free_children(AST *ast) {
             ast_free_children(ast->assign.target);
             ast_free_children(ast->assign.val);
             break;
+        case AST_PRINT:
             for (int i = 0; i < ast->print.count; i++) ast_free_children(ast->print.vals[i]);
             free(ast->print.vals);
             break;
@@ -663,9 +720,23 @@ static void ast_free_children(AST *ast) {
             ast_free_children(ast->range.start);
             ast_free_children(ast->range.end);
             break;
-            free(ast->enum_def.enum_name);
-            for (int i = 0; i < ast->enum_def.variant_count; i++) free(ast->enum_def.variants[i]);
-            free(ast->enum_def.variants);
+        case AST_SAFE_INDEX:
+            ast_free_children(ast->safe_index.arr);
+            ast_free_children(ast->safe_index.idx);
+            ast_free_children(ast->safe_index.fallback);
+            break;
+        case AST_SWAP:
+            ast_free_children(ast->swap.left);
+            ast_free_children(ast->swap.right);
+            break;
+        case AST_ASSERT:
+            ast_free_children(ast->assert_stmt.expr);
+            break;
+        case AST_FOREVER:
+            ast_free_children(ast->forever.body);
+            break;
+        case AST_BREAK:
+        case AST_CONTINUE:
             break;
         default:
             break;

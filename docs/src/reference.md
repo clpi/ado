@@ -63,6 +63,67 @@ Ado supports a standard array of operators.
 - `or` : Logical OR
 - `not` : Logical NOT
 
+## Rare but Useful Language Features
+
+Ado includes a few compact features that are uncommon in small systems languages but useful for writing safer, clearer programs.
+
+### Safe Array Indexing
+
+`arr?idx` returns `arr[idx]` when `idx` is in bounds and `0` otherwise. Add `:fallback` to choose another default value.
+
+```ado
+let arr = [10, 20, 30]
+print(arr?1)      # 20
+print(arr?9:-1)   # -1
+```
+
+### Negative Branching
+
+`unless condition { } else { }` is the inverse of `if`.
+
+```ado
+unless done {
+  print("keep working")
+} else {
+  print("finished")
+}
+```
+
+### Parallel Swap
+
+`swap a, b` exchanges two assignable expressions without a temporary variable in Ado source.
+
+```ado
+let a = 1
+let b = 2
+swap a, b
+print(a, b) # 2 1
+```
+
+### Runtime Assertions
+
+`assert expr` exits the program when `expr` is false.
+
+```ado
+let n = len(items)
+assert n > 0
+```
+
+### Infinite Loops and Explicit Flow Control
+
+`forever { }` creates an intentionally unbounded loop. Use `break` and `continue` to leave or restart the current loop.
+
+```ado
+forever {
+  if done {
+    break
+  }
+  if skip_step {
+    continue
+  }
+}
+```
+
 ## Control Flow
 
 ### If / Else

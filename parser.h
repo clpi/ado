@@ -8,7 +8,8 @@ typedef enum {
     AST_IF, AST_WHILE, AST_FOR, AST_RETURN, AST_BLOCK, AST_FN,
     AST_ARRAY, AST_INDEX, AST_ASSIGN, AST_PRINT, AST_LEN, AST_PUSH,
     AST_UNARY, AST_TYPE, AST_HINT, AST_MATCH, AST_ENUM, AST_PIPE,
-    AST_SLICE, AST_LISTCOMP, AST_DESTRUCT, AST_RANGE
+    AST_SLICE, AST_LISTCOMP, AST_DESTRUCT, AST_RANGE, AST_SAFE_INDEX,
+    AST_SWAP, AST_ASSERT, AST_FOREVER, AST_BREAK, AST_CONTINUE
 } ASTType;
 
 typedef struct {
@@ -19,6 +20,7 @@ typedef struct {
 typedef struct AST {
     ASTType type;
     TypeHint *hint;
+    int line;
     union {
         int int_val;
         char *str_val;
@@ -28,7 +30,7 @@ typedef struct AST {
         struct { struct AST *operand; TokenType op; } unary;
         struct { char *name; struct AST **args; int argc; TypeHint **hints; } call;
         struct { char *name; struct AST *val; TypeHint *type_hint; } let;
-        struct { struct AST *cond, *then, *els; } if_stmt;
+        struct { struct AST *cond, *then, *els; int invert_cond; } if_stmt;
         struct { struct AST *cond, *body; } while_stmt;
         struct { char *var; struct AST *start, *end, *body; } for_stmt;
         struct { struct AST *val; } ret;
@@ -47,6 +49,10 @@ typedef struct AST {
         struct { struct AST *arr; struct AST *start; struct AST *end; } slice;
         struct { char *var; struct AST *start; struct AST *end; struct AST *body; struct AST *filter; } listcomp;
         struct { char **names; int count; int has_rest; char *rest_name; struct AST *val; } destruct;
+        struct { struct AST *arr; struct AST *idx; struct AST *fallback; } safe_index;
+        struct { struct AST *left, *right; } swap;
+        struct { struct AST *expr; } assert_stmt;
+        struct { struct AST *body; } forever;
     };
 } AST;
 
