@@ -1,5 +1,8 @@
 # Math functions demonstration
 
+fn debug(msg, exp) {
+
+}
 fn power(base, exp) {
   if exp == 0 {
     return 1
