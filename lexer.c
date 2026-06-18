@@ -181,7 +181,10 @@ Token lexer_next(Lexer *lex) {
             break;
         case '@': tok.type = TOK_AT; break;
         case ';': tok.type = TOK_SEMI; break;
-        case '|': tok.type = TOK_PIPE; break;
+        case '|':
+            if (lex->src[lex->pos] == '>') { lex->pos++; }
+            tok.type = TOK_PIPE;
+            break;
         case '?': tok.type = TOK_QMARK; break;
         case '+': tok.type = TOK_PLUS; break;
         case '-':

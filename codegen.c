@@ -578,8 +578,8 @@ void codegen(AST *ast, FILE *out) {
     fprintf(out, "static int ado_capacity(AdoArray a) { return a.cap; }\n");
     fprintf(out, "static int ado_reserve(AdoArray *a, int c) { if(c>a->cap){a->cap=c;a->data=realloc(a->data,c*4);} return 0; }\n");
     fprintf(out, "static int ado_shrink_to_fit(AdoArray *a) { if(a->cap>a->len){a->cap=a->len;a->data=realloc(a->data,a->cap*4);} return 0; }\n");
-    fprintf(out, "static void ado_qsort(int *d, int lo, int hi) { if(lo>=hi) return; int p=d[hi],i=lo-1,j,t; for(j=lo;j<hi;j++){if(d[j]<=p){i++;t=d[i];d[i]=d[j];d[j]=t;}} t=d[i+1];d[i+1]=d[hi];d[hi]=t; ado_qsort(d,lo,i); ado_qsort(d,i+2,hi); }\n");
-    fprintf(out, "static int ado_sort(AdoArray a) { if(a.len>1) ado_qsort(a.data,0,a.len-1); return 0; }\n");
+    fprintf(out, "static void ado_isort(int *d, int lo, int hi) { for(int i=lo+1;i<=hi;i++){int v=d[i],j=i-1;while(j>=lo&&d[j]>v){d[j+1]=d[j];j--;}d[j+1]=v;} }\n");
+    fprintf(out, "static int ado_sort(AdoArray a) { if(a.len<2) return 0; if(a.len<32){ado_isort(a.data,0,a.len-1); return 0;} int stk[128],top=0,lo=0,hi=a.len-1;stk[top++]=lo;stk[top++]=hi;while(top>0){hi=stk[--top];lo=stk[--top];int mid=lo+(hi-lo)/2,piv=a.data[mid];a.data[mid]=a.data[hi];a.data[hi]=piv;int i=lo-1;for(int j=lo;j<hi;j++){if(a.data[j]<=a.data[hi]){i++;int t=a.data[i];a.data[i]=a.data[j];a.data[j]=t;}}int t=a.data[i+1];a.data[i+1]=a.data[hi];a.data[hi]=t;int p=i+1;if(p-1>lo){stk[top++]=lo;stk[top++]=p-1;}if(p+1<hi){stk[top++]=p+1;stk[top++]=hi;}} return 0; }\n");
     fprintf(out, "static AdoArray ado_unique(AdoArray a) { if(a.len<=1){AdoArray r=ado_make_array((int[]){},a.len); for(int i=0;i<a.len;i++)r.data[i]=a.data[i]; r.len=a.len; return r;} ado_sort(a); AdoArray r=ado_make_array((int[]){},a.len); r.data[r.len++]=a.data[0]; for(int i=1;i<a.len;i++){if(a.data[i]!=a.data[i-1])r.data[r.len++]=a.data[i];} return r; }\n");
     fprintf(out, "static int ado_reflect(AdoArray a) { printf(\"Array(len=%%d,cap=%%d)\",a.len,a.cap); return 0; }\n");
     
