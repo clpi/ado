@@ -39,9 +39,18 @@ class AdoLSP:
         self.symbols_by_uri: Dict[str, List[Symbol]] = {}
         self.keywords = ['fn', 'let', 'if', 'unless', 'else', 'while', 'forever', 'for', 'return', 'in',
                          'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push',
-                         'hint', 'type', 'inline', 'const', 'static', 'break', 'continue',
-                         'assert', 'swap']
-        self.builtins = ['print', 'len', 'push', 'abs', 'min', 'max', 'pow', 'clamp', 'sign', 'is_even', 'is_odd', 'gcd', 'lcm', 'factorial', 'fib', 'sum', 'avg', 'take', 'drop', 'concat', 'fill', 'slice']
+                         'hint', 'type', 'break', 'continue',
+                         'assert', 'swap', 'match', 'enum', 'defer', 'guard', 'until']
+        self.builtins = ['print', 'len', 'push', 'abs', 'min', 'max', 'pow', 'clamp', 'sign',
+                         'is_even', 'is_odd', 'gcd', 'lcm', 'factorial', 'fib',
+                         'sum', 'avg', 'take', 'drop', 'concat', 'fill', 'slice',
+                         'pop', 'reverse', 'remove', 'insert', 'contains', 'count_if',
+                         'filter', 'find', 'all', 'any',
+                         'http_get', 'http_post', 'http_put', 'http_delete', 'http_status',
+                         'getenv', 'exit', 'read_file', 'write_file', 'file_exists',
+                         'sleep', 'time', 'random',
+                         'capacity', 'reserve', 'shrink_to_fit',
+                         'sort', 'unique', 'reflect']
 
     _MASK_RE = re.compile(r'(")((?:[^"\\]|\\.)*)("?)|(#)([^\n]*)')
 
@@ -76,6 +85,7 @@ class AdoLSP:
         masked_lines = masked_text.split('\n')
         fn_pattern = re.compile(r'fn\s+(\w+)\s*\(([^)]*)\)')
         let_pattern = re.compile(r'let\s+(\w+)\s*=')
+        enum_pattern = re.compile(r'enum\s+(\w+)\s*\{')
 
         brace_count = 0
         active_functions = []
@@ -207,6 +217,23 @@ class AdoLSP:
                             scope_start_line=i, scope_start_col=destruct_match.end() + 1)
                         symbols.append(d_sym)
 
+            # Enum definitions
+            for match in enum_pattern.finditer(masked_line):
+                enum_name = match.group(1)
+                e_sym = Symbol(name=enum_name, kind='enum', uri=uri,
+                    line=i, col=match.start(1), end_line=i, end_col=match.end(1))
+                symbols.append(e_sym)
+                # Parse variants within the braces
+                rest = masked_line[match.end():]
+                variant_matches = re.finditer(r'\b(\w+)\b', rest)
+                for vm in variant_matches:
+                    v_name = vm.group(1)
+                    if v_name not in self.keywords and v_name != enum_name:
+                        v_sym = Symbol(name=v_name, kind='enum_member', uri=uri,
+                            line=i, col=match.end() + vm.start(1),
+                            end_line=i, end_col=match.end() + vm.end(1))
+                        symbols.append(v_sym)
+
         for sym in symbols:
             if sym.name not in self.symbols: self.symbols[sym.name] = []
             self.symbols[sym.name].append(sym)
@@ -248,6 +275,35 @@ class AdoLSP:
                     },
                     'severity': 1,
                     'message': 'let statement requires assignment',
+                    'source': 'ado-lsp'
+                })
+
+            # Check for match statement missing braces
+            match_kw = re.search(r'\bmatch\s+\w+', line)
+            if match_kw:
+                # Verify balanced braces for match
+                rest = line[match_kw.end():]
+                if '{' not in rest:
+                    diagnostics.append({
+                        'range': {
+                            'start': {'line': i, 'character': match_kw.start()},
+                            'end': {'line': i, 'character': match_kw.end()}
+                        },
+                        'severity': 2,
+                        'message': 'match statement should have brace-delimited arms',
+                        'source': 'ado-lsp'
+                    })
+
+            # Check for guard without else
+            guard_match = re.search(r'\bguard\s+', line)
+            if guard_match and 'else' not in line:
+                diagnostics.append({
+                    'range': {
+                        'start': {'line': i, 'character': guard_match.start()},
+                        'end': {'line': i, 'character': guard_match.end()}
+                    },
+                    'severity': 2,
+                    'message': 'guard statement should have else clause',
                     'source': 'ado-lsp'
                 })
 
@@ -516,6 +572,48 @@ class AdoLSP:
             'pow': 'pow(base, exp) - Power function',
             'clamp': 'clamp(x, low, high) - Clamp value to range',
             'slice': 'arr[start..end] - Array slice (exclusive end)',
+            'sign': 'sign(x) - Sign of x (-1, 0, or 1)',
+            'is_even': 'is_even(x) - Check if x is even',
+            'is_odd': 'is_odd(x) - Check if x is odd',
+            'gcd': 'gcd(a, b) - Greatest common divisor',
+            'lcm': 'lcm(a, b) - Least common multiple',
+            'factorial': 'factorial(n) - Factorial of n',
+            'fib': 'fib(n) - Fibonacci number at index n',
+            'sum': 'sum(arr) - Sum of array elements',
+            'avg': 'avg(arr) - Average of array elements',
+            'take': 'take(arr, n) - Take first n elements',
+            'drop': 'drop(arr, n) - Drop first n elements',
+            'concat': 'concat(a, b) - Concatenate two arrays',
+            'fill': 'fill(n, v) - Create array of n copies of v',
+            'pop': 'pop(&arr) - Remove and return last element',
+            'reverse': 'reverse(&arr) - Reverse array in place',
+            'remove': 'remove(&arr, idx) - Remove element at index',
+            'insert': 'insert(&arr, idx, val) - Insert value at index',
+            'contains': 'contains(arr, val) - Check if array contains value',
+            'count_if': 'count_if(arr, val) - Count occurrences of val',
+            'filter': 'filter(arr, val) - Filter out val from array',
+            'find': 'find(arr, val) - Find first index of val (-1 if not found)',
+            'all': 'all(arr) - True if all elements are truthy',
+            'any': 'any(arr) - True if any element is truthy',
+            'sort': 'sort(arr) - Sort array in place',
+            'unique': 'unique(arr) - Return deduplicated array',
+            'reflect': 'reflect(arr) - Print array metadata',
+            'http_get': 'http_get(url) - HTTP GET request',
+            'http_post': 'http_post(url, body) - HTTP POST request',
+            'http_put': 'http_put(url, body) - HTTP PUT request',
+            'http_delete': 'http_delete(url) - HTTP DELETE request',
+            'http_status': 'http_status(url) - Check HTTP status code',
+            'getenv': 'getenv(name) - Get environment variable',
+            'exit': 'exit(code) - Exit program with code',
+            'read_file': 'read_file(path) - Read file contents',
+            'write_file': 'write_file(path, content) - Write integer to file',
+            'file_exists': 'file_exists(path) - Check if file exists',
+            'sleep': 'sleep(ms) - Sleep for milliseconds',
+            'time': 'time() - Current Unix timestamp',
+            'random': 'random(max) - Random number in [0, max)',
+            'capacity': 'capacity(arr) - Get array capacity',
+            'reserve': 'reserve(&arr, cap) - Reserve array capacity',
+            'shrink_to_fit': 'shrink_to_fit(&arr) - Shrink array to fit',
         }
 
         if word in builtin_docs:
@@ -682,11 +780,19 @@ class AdoLSP:
 
     def handle_document_symbols(self, msg: dict) -> list:
         uri = msg['params']['textDocument']['uri']
+        # LSP SymbolKind constants
+        kind_map = {
+            'function': 12,     # Function
+            'variable': 13,     # Variable
+            'parameter': 13,    # Variable (no param kind)
+            'enum': 10,         # Enum
+            'enum_member': 22,  # EnumMember
+        }
         symbols = []
         for sym in self.symbols_by_uri.get(uri, []):
             symbols.append({
                 'name': sym.name,
-                'kind': 12 if sym.kind == 'function' else 13, # Function or Variable
+                'kind': kind_map.get(sym.kind, 13),
                 'location': {
                     'uri': uri,
                     'range': {
@@ -699,6 +805,10 @@ class AdoLSP:
 
     def handle_workspace_symbols(self, msg: dict) -> list:
         query = msg['params'].get('query', '').lower()
+        kind_map = {
+            'function': 12, 'variable': 13, 'parameter': 13,
+            'enum': 10, 'enum_member': 22,
+        }
         symbols = []
         for name, sym_list in self.symbols.items():
             if query and query not in name.lower():
@@ -706,7 +816,7 @@ class AdoLSP:
             for sym in sym_list:
                 symbols.append({
                     'name': name,
-                    'kind': 12 if sym.kind == 'function' else 13, # Function or Variable
+                    'kind': kind_map.get(sym.kind, 13),
                     'location': {
                         'uri': sym.uri,
                         'range': {
@@ -923,6 +1033,24 @@ class AdoLSP:
                         'arguments': [sym.name]
                     }
                 })
+
+        # Add code lens for enum definitions found in text
+        enum_pattern = re.compile(r'enum\s+(\w+)\s*\{')
+        masked_text = self._mask_text(text)
+        for i, line in enumerate(masked_text.split('\n')):
+            for match in enum_pattern.finditer(line):
+                name = match.group(1)
+                lenses.append({
+                    'range': {
+                        'start': {'line': i, 'character': 0},
+                        'end': {'line': i, 'character': len(lines[i]) if i < len(lines) else 0}
+                    },
+                    'command': {
+                        'title': f"enum {name}",
+                        'command': "ado.showEnum",
+                        'arguments': [name]
+                    }
+                })
         
         return lenses
 
@@ -1003,6 +1131,46 @@ class AdoLSP:
             'insertTextFormat': 2
         })
 
+        items.append({
+            'label': 'match',
+            'kind': 14,
+            'detail': 'pattern matching',
+            'insertText': 'match ${1:expr} {\n  ${2:pattern} => ${3:result},\n  _ => ${4:default}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'enum',
+            'kind': 14,
+            'detail': 'enum type definition',
+            'insertText': 'enum ${1:Name} { ${2:variant1}, ${3:variant2} }',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'defer',
+            'kind': 14,
+            'detail': 'deferred execution',
+            'insertText': 'defer ${1:expr}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'guard',
+            'kind': 14,
+            'detail': 'guard clause with early return',
+            'insertText': 'guard ${1:condition} else {\n  ${2:body}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'until',
+            'kind': 14,
+            'detail': 'until loop (inverted while)',
+            'insertText': 'until ${1:condition} {\n  ${2:body}\n}',
+            'insertTextFormat': 2
+        })
+
         # Add symbols
         for name, sym_list in self.symbols.items():
             sym = sym_list[0]
@@ -1016,6 +1184,18 @@ class AdoLSP:
                     'insertText': snippet,
                     'insertTextFormat': 2, # Snippet
                     'documentation': sym.docstring
+                })
+            elif sym.kind == 'enum':
+                items.append({
+                    'label': name,
+                    'kind': 10, # Enum
+                    'detail': 'enum'
+                })
+            elif sym.kind == 'enum_member':
+                items.append({
+                    'label': name,
+                    'kind': 22, # EnumMember
+                    'detail': 'enum member'
                 })
             else:
                 items.append({
@@ -1132,10 +1312,14 @@ class AdoLSP:
                 for match in re.finditer(r'\b' + re.escape(kw) + r'\b', line):
                     tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
 
-            # Find special operators: .., ... and safe-index ?
+            # Find special operators: .., ..., |> and safe-index ?
             for match in re.finditer(r'\.\.', line):
                 tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
             for match in re.finditer(r'\.\.\.', line):
+                tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
+            for match in re.finditer(r'\|>', line):
+                tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
+            for match in re.finditer(r'=>', line):
                 tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
             for match in re.finditer(r'\?', line):
                 tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
@@ -1144,7 +1328,7 @@ class AdoLSP:
             listcomp_match = re.search(r'\[\s*for\s+\w+\s+in', line)
             if listcomp_match:
                 for match in re.finditer(r'\[', line):
-                    tokens.append((i, match.start(), match.end() - match.start(), token_types['keyword'], 0))
+                    tokens.append((i, match.start(), match.end() - match.start(), token_types['operator'], 0))
 
             # Find destructuring patterns in let statements
             destruct_match = re.search(r'let\s*\[\s*', line)

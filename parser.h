@@ -9,7 +9,8 @@ typedef enum {
     AST_ARRAY, AST_INDEX, AST_ASSIGN, AST_PRINT, AST_LEN, AST_PUSH,
     AST_UNARY, AST_TYPE, AST_HINT, AST_MATCH, AST_ENUM, AST_PIPE,
     AST_SLICE, AST_LISTCOMP, AST_DESTRUCT, AST_RANGE, AST_SAFE_INDEX,
-    AST_SWAP, AST_ASSERT, AST_FOREVER, AST_BREAK, AST_CONTINUE
+    AST_SWAP, AST_ASSERT, AST_FOREVER, AST_BREAK, AST_CONTINUE, AST_DEFER,
+    AST_GUARD, AST_UNTIL, AST_MATCH_ARM
 } ASTType;
 
 typedef struct {
@@ -46,6 +47,7 @@ typedef struct AST {
         struct { char *name; struct AST *args; } hint_stmt;
         struct { char *enum_name; struct AST **variants; int variant_count; } enum_def;
         struct { struct AST *expr; struct AST **arms; int arm_count; } match_stmt;
+        struct { struct AST *pattern; struct AST *body; int is_default; } match_arm;
         struct { struct AST *arr; struct AST *start; struct AST *end; } slice;
         struct { char *var; struct AST *start; struct AST *end; struct AST *body; struct AST *filter; } listcomp;
         struct { char **names; int count; int has_rest; char *rest_name; struct AST *val; } destruct;
@@ -53,6 +55,9 @@ typedef struct AST {
         struct { struct AST *left, *right; } swap;
         struct { struct AST *expr; } assert_stmt;
         struct { struct AST *body; } forever;
+        struct { struct AST *expr; } defer_stmt;
+        struct { struct AST *cond; struct AST *body; } guard_stmt;
+        struct { struct AST *cond; struct AST *body; } until_stmt;
     };
 } AST;
 

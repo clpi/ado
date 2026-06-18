@@ -15,9 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: actionlint
-        run: |
-          bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) || true
-          ./actionlint -color
+        uses: reviewdog/action-actionlint@v1
+        with:
+          fail_on_error: false
       - name: shellcheck
         run: |
           sudo apt-get update
@@ -106,7 +106,13 @@ jobs:
           RPM_ARCH="aarch64"
         fi
 
-        fpm -s dir -t deb -n ado -v "$VERSION" -a "$ARCH" -d "libcurl4" -d "python3" -C ./tmp_install .
+        # Detect correct libcurl package name (Ubuntu 24.04+ uses libcurl4t64)
+        LIBCURL_DEB="libcurl4"
+        if dpkg -l libcurl4t64 2>/dev/null; then
+          LIBCURL_DEB="libcurl4t64"
+        fi
+
+        fpm -s dir -t deb -n ado -v "$VERSION" -a "$ARCH" -d "${LIBCURL_DEB}" -d "python3" -C ./tmp_install .
         fpm -s dir -t rpm -n ado -v "$VERSION" -a "$RPM_ARCH" -d "libcurl" -d "python3" -C ./tmp_install .
         fpm -s dir -t apk -n ado -v "$VERSION" -a "$RPM_ARCH" -d "curl" -d "python3" -C ./tmp_install .
         fpm -s dir -t pacman -n ado -v "$VERSION" -a "$RPM_ARCH" -d "curl" -d "python" -C ./tmp_install .

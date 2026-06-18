@@ -124,6 +124,37 @@ static AST *parse_primary(Parser *p) {
         advance(p);
         return ast;
     }
+    if (p->cur.type == TOK_PRINT) {
+        advance(p);
+        advance(p);
+        AST *ast = new_ast(p, AST_CALL);
+        ast->call.name = "print";
+        ast->call.args = NULL;
+        ast->call.argc = 0;
+        if (p->cur.type != TOK_RPAREN) {
+            int cap = 4;
+            ast->call.args = malloc(cap * sizeof(AST*));
+            while (1) {
+                if (ast->call.argc >= cap) {
+                    cap *= 2;
+                    ast->call.args = realloc(ast->call.args, cap * sizeof(AST*));
+                }
+                ast->call.args[ast->call.argc++] = parse_expr(p);
+                if (p->cur.type != TOK_COMMA) break;
+                advance(p);
+            }
+        }
+        advance(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_LEN) {
+        advance(p);
+        advance(p);
+        AST *ast = new_ast(p, AST_LEN);
+        ast->len.arr = parse_expr(p);
+        advance(p);
+        return ast;
+    }
     if (p->cur.type == TOK_IDENT) {
         char *name = p->cur.value;
         advance(p);
@@ -206,6 +237,24 @@ static AST *parse_primary(Parser *p) {
         advance(p);
         AST *ast = new_ast(p, AST_LEN);
         ast->len.arr = parse_expr(p);
+        advance(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_PRINT) {
+        advance(p);
+        advance(p);
+        AST *ast = new_ast(p, AST_PRINT);
+        int cap = 4;
+        ast->print.vals = malloc(cap * sizeof(AST*));
+        ast->print.count = 0;
+        while (p->cur.type != TOK_RPAREN) {
+            if (ast->print.count >= cap) {
+                cap *= 2;
+                ast->print.vals = realloc(ast->print.vals, cap * sizeof(AST*));
+            }
+            ast->print.vals[ast->print.count++] = parse_expr(p);
+            if (p->cur.type == TOK_COMMA) advance(p);
+        }
         advance(p);
         return ast;
     }
@@ -317,6 +366,24 @@ static AST *parse_block(Parser *p) {
     return ast;
 }
 
+static AST *parse_match_arm(Parser *p) {
+    AST *ast = new_ast(p, AST_MATCH_ARM);
+    ast->match_arm.pattern = parse_expr(p);
+    if (ast->match_arm.pattern && ast->match_arm.pattern->type == AST_VAR && strcmp(ast->match_arm.pattern->var_name, "_") == 0) {
+        ast->match_arm.is_default = 1;
+    }
+    if (p->cur.type == TOK_FATARROW) advance(p);
+    if (p->cur.type == TOK_PRINT) {
+        ast->match_arm.body = parse_stmt(p);
+    } else if (p->cur.type == TOK_LBRACE) {
+        ast->match_arm.body = parse_block(p);
+    } else {
+        ast->match_arm.body = parse_expr(p);
+    }
+    if (p->cur.type == TOK_COMMA) advance(p);
+    return ast;
+}
+
 static AST *parse_stmt(Parser *p) {
     if (p->cur.type == TOK_AT) {
         advance(p);
@@ -346,6 +413,35 @@ static AST *parse_stmt(Parser *p) {
         ast->assert_stmt.expr = parse_expr(p);
         return ast;
     }
+    if (p->cur.type == TOK_DEFER) {
+        advance(p);
+        AST *ast = new_ast(p, AST_DEFER);
+        if (p->cur.type == TOK_PRINT) {
+            ast->defer_stmt.expr = parse_stmt(p);
+        } else {
+            ast->defer_stmt.expr = parse_expr(p);
+        }
+        return ast;
+    }
+    if (p->cur.type == TOK_GUARD) {
+        advance(p);
+        AST *ast = new_ast(p, AST_GUARD);
+        ast->guard_stmt.cond = parse_expr(p);
+        if (p->cur.type == TOK_ELSE) {
+            advance(p);
+            if (p->cur.type == TOK_LBRACE) {
+                ast->guard_stmt.body = parse_block(p);
+            }
+        }
+        return ast;
+    }
+    if (p->cur.type == TOK_UNTIL) {
+        advance(p);
+        AST *ast = new_ast(p, AST_UNTIL);
+        ast->until_stmt.cond = parse_expr(p);
+        ast->until_stmt.body = parse_block(p);
+        return ast;
+    }
     if (p->cur.type == TOK_SWAP) {
         advance(p);
         AST *ast = new_ast(p, AST_SWAP);
@@ -370,7 +466,9 @@ static AST *parse_stmt(Parser *p) {
     }
     if (p->cur.type == TOK_IDENT) {
         char *saved_name = p->cur.value;
-        Parser saved_parser = *p;
+        Token saved_cur = p->cur;
+        int saved_pos = p->lex->pos;
+        int saved_line = p->lex->line;
         advance(p);
         if (p->cur.type == TOK_COLONCOLON || p->cur.type == TOK_COLON) {
             int is_required = (p->cur.type == TOK_COLONCOLON);
@@ -438,7 +536,9 @@ static AST *parse_stmt(Parser *p) {
             advance(p);
             return ast;
         }
-        *p = saved_parser;
+        p->cur = saved_cur;
+        p->lex->pos = saved_pos;
+        p->lex->line = saved_line;
     }
     if (p->cur.type == TOK_LET) {
         advance(p);
@@ -534,22 +634,20 @@ static AST *parse_stmt(Parser *p) {
     }
     if (p->cur.type == TOK_MATCH) {
         advance(p);
-        advance(p);
         AST *ast = new_ast(p, AST_MATCH);
         ast->match_stmt.expr = parse_expr(p);
-        advance(p);
+        if (p->cur.type == TOK_LBRACE) advance(p);
         int cap = 4;
         ast->match_stmt.arms = malloc(cap * sizeof(AST*));
         ast->match_stmt.arm_count = 0;
-        while (p->cur.type == TOK_IDENT || p->cur.type == TOK_INT || p->cur.type == TOK_TRUE || p->cur.type == TOK_FALSE) {
+        while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
             if (ast->match_stmt.arm_count >= cap) {
                 cap *= 2;
                 ast->match_stmt.arms = realloc(ast->match_stmt.arms, cap * sizeof(AST*));
             }
-            ast->match_stmt.arms[ast->match_stmt.arm_count++] = parse_stmt(p);
-            if (p->cur.type == TOK_COMMA) advance(p);
+            ast->match_stmt.arms[ast->match_stmt.arm_count++] = parse_match_arm(p);
         }
-        advance(p);
+        if (p->cur.type == TOK_RBRACE) advance(p);
         return ast;
     }
     if (p->cur.type == TOK_ENUM) {
@@ -560,6 +658,7 @@ static AST *parse_stmt(Parser *p) {
         int cap = 4;
         ast->enum_def.variants = malloc(cap * sizeof(AST*));
         ast->enum_def.variant_count = 0;
+        if (p->cur.type == TOK_LBRACE) advance(p);
         while (p->cur.type == TOK_IDENT) {
             if (ast->enum_def.variant_count >= cap) {
                 cap *= 2;
@@ -571,7 +670,8 @@ static AST *parse_stmt(Parser *p) {
             advance(p);
             if (p->cur.type == TOK_COMMA) advance(p);
         }
-        advance(p);
+        if (p->cur.type == TOK_LBRACE) advance(p);
+        if (p->cur.type == TOK_RBRACE) advance(p);
         return ast;
     }
     return parse_expr(p);
@@ -711,9 +811,13 @@ static void ast_free_children(AST *ast) {
             for (int i = 0; i < ast->match_stmt.arm_count; i++) ast_free_children(ast->match_stmt.arms[i]);
             free(ast->match_stmt.arms);
             break;
+        case AST_MATCH_ARM:
+            ast_free_children(ast->match_arm.pattern);
+            ast_free_children(ast->match_arm.body);
+            break;
         case AST_ENUM:
             free(ast->enum_def.enum_name);
-            for (int i = 0; i < ast->enum_def.variant_count; i++) free(ast->enum_def.variants[i]);
+            for (int i = 0; i < ast->enum_def.variant_count; i++) ast_free_children(ast->enum_def.variants[i]);
             free(ast->enum_def.variants);
             break;
         case AST_RANGE:
@@ -734,6 +838,17 @@ static void ast_free_children(AST *ast) {
             break;
         case AST_FOREVER:
             ast_free_children(ast->forever.body);
+            break;
+        case AST_DEFER:
+            ast_free_children(ast->defer_stmt.expr);
+            break;
+        case AST_GUARD:
+            ast_free_children(ast->guard_stmt.cond);
+            ast_free_children(ast->guard_stmt.body);
+            break;
+        case AST_UNTIL:
+            ast_free_children(ast->until_stmt.cond);
+            ast_free_children(ast->until_stmt.body);
             break;
         case AST_BREAK:
         case AST_CONTINUE:

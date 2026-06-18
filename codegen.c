@@ -4,9 +4,57 @@
 #include "codegen.h"
 
 static void gen_expr(AST *ast, FILE *out);
+static void gen_stmt(AST *ast, FILE *out, int indent);
 
 static int ado_temp_counter = 0;
+static int ado_defer_counter = 0;
 static int next_temp(void) { return ado_temp_counter++; }
+static int next_defer(void) { return ado_defer_counter++; }
+
+static void gen_indent(FILE *out, int indent);
+static void gen_stmt_as_body(AST *ast, FILE *out, int indent);
+
+static void gen_defer_cleanup(AST *ast, FILE *out, int indent, int id) {
+    gen_indent(out, indent);
+    fprintf(out, "void _ado_defer_%d(void) {\n", id);
+    gen_stmt_as_body(ast, out, indent + 1);
+    gen_indent(out, indent);
+    fprintf(out, "}\n");
+    gen_indent(out, indent);
+    fprintf(out, "void _ado_defer_cleanup_%d(void *unused) { _ado_defer_%d(); }\n", id, id);
+    gen_indent(out, indent);
+    fprintf(out, "char _ado_defer_%d __attribute__((cleanup(_ado_defer_cleanup_%d))) = 0;\n", id, id);
+}
+
+static void gen_stmt_as_body(AST *ast, FILE *out, int indent) {
+    if (!ast) return;
+    switch (ast->type) {
+        case AST_PRINT:
+        case AST_ASSIGN:
+        case AST_PUSH:
+        case AST_ASSERT:
+        case AST_SWAP:
+        case AST_IF:
+        case AST_WHILE:
+        case AST_FOR:
+        case AST_UNTIL:
+        case AST_FOREVER:
+        case AST_BREAK:
+        case AST_CONTINUE:
+        case AST_RETURN:
+        case AST_GUARD:
+        case AST_DEFER:
+        case AST_MATCH:
+        case AST_BLOCK:
+            gen_stmt(ast, out, indent);
+            break;
+        default:
+            gen_indent(out, indent);
+            gen_expr(ast, out);
+            fprintf(out, ";\n");
+            break;
+    }
+}
 
 static void gen_str_escape(const char *s, FILE *out) {
     while (*s) {
@@ -76,6 +124,48 @@ static void gen_expr(AST *ast, FILE *out) {
             else if (strcmp(name, "max") == 0) name = "ado_max";
             else if (strcmp(name, "clamp") == 0) name = "ado_clamp";
             else if (strcmp(name, "pow") == 0) name = "ado_pow";
+            else if (strcmp(name, "sign") == 0) name = "ado_sign";
+            else if (strcmp(name, "is_even") == 0) name = "ado_is_even";
+            else if (strcmp(name, "is_odd") == 0) name = "ado_is_odd";
+            else if (strcmp(name, "gcd") == 0) name = "ado_gcd";
+            else if (strcmp(name, "lcm") == 0) name = "ado_lcm";
+            else if (strcmp(name, "factorial") == 0) name = "ado_factorial";
+            else if (strcmp(name, "fib") == 0) name = "ado_fib";
+            else if (strcmp(name, "sum") == 0) name = "ado_sum";
+            else if (strcmp(name, "avg") == 0) name = "ado_avg";
+            else if (strcmp(name, "contains") == 0) name = "ado_contains";
+            else if (strcmp(name, "count_if") == 0) name = "ado_count_if";
+            else if (strcmp(name, "find") == 0) name = "ado_find";
+            else if (strcmp(name, "all") == 0) name = "ado_all";
+            else if (strcmp(name, "any") == 0) name = "ado_any";
+            else if (strcmp(name, "pop") == 0) name = "ado_pop";
+            else if (strcmp(name, "reverse") == 0) name = "ado_reverse";
+            else if (strcmp(name, "remove") == 0) name = "ado_remove";
+            else if (strcmp(name, "insert") == 0) name = "ado_insert";
+            else if (strcmp(name, "take") == 0) name = "ado_take";
+            else if (strcmp(name, "drop") == 0) name = "ado_drop";
+            else if (strcmp(name, "concat") == 0) name = "ado_concat";
+            else if (strcmp(name, "fill") == 0) name = "ado_fill";
+            else if (strcmp(name, "filter") == 0) name = "ado_filter";
+            else if (strcmp(name, "sort") == 0) name = "ado_sort";
+            else if (strcmp(name, "unique") == 0) name = "ado_unique";
+            else if (strcmp(name, "reflect") == 0) name = "ado_reflect";
+            else if (strcmp(name, "capacity") == 0) name = "ado_capacity";
+            else if (strcmp(name, "reserve") == 0) name = "ado_reserve";
+            else if (strcmp(name, "shrink_to_fit") == 0) name = "ado_shrink_to_fit";
+            else if (strcmp(name, "http_get") == 0) name = "ado_http_get";
+            else if (strcmp(name, "http_post") == 0) name = "ado_http_post";
+            else if (strcmp(name, "http_put") == 0) name = "ado_http_put";
+            else if (strcmp(name, "http_delete") == 0) name = "ado_http_delete";
+            else if (strcmp(name, "http_status") == 0) name = "ado_http_status";
+            else if (strcmp(name, "getenv") == 0) name = "ado_getenv";
+            else if (strcmp(name, "exit") == 0) name = "ado_exit";
+            else if (strcmp(name, "read_file") == 0) name = "ado_read_file";
+            else if (strcmp(name, "write_file") == 0) name = "ado_write_file";
+            else if (strcmp(name, "file_exists") == 0) name = "ado_file_exists";
+            else if (strcmp(name, "sleep") == 0) name = "ado_sleep";
+            else if (strcmp(name, "time") == 0) name = "ado_time";
+            else if (strcmp(name, "random") == 0) name = "ado_random";
             fprintf(out, "%s(", name);
             for (int i = 0; i < ast->call.argc; i++) {
                 gen_expr(ast->call.args[i], out);
@@ -167,7 +257,7 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             if (ast->if_stmt.invert_cond) fprintf(out, "if(!(");
             else fprintf(out, "if(");
             gen_expr(ast->if_stmt.cond, out);
-            fprintf(out, "){\n");
+            fprintf(out, ast->if_stmt.invert_cond ? ")){\n" : "){\n");
             gen_block(ast->if_stmt.then, out, indent + 1);
             gen_indent(out, indent);
             fprintf(out, "}");
@@ -253,6 +343,31 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             }
             fprintf(out, ");\n");
             break;
+        case AST_DEFER: {
+            int id = next_defer();
+            gen_defer_cleanup(ast->defer_stmt.expr, out, indent, id);
+            break;
+        }
+        case AST_GUARD:
+            gen_indent(out, indent);
+            fprintf(out, "if(!(");
+            gen_expr(ast->guard_stmt.cond, out);
+            fprintf(out, ")){\n");
+            if (ast->guard_stmt.body) gen_block(ast->guard_stmt.body, out, indent + 1);
+            gen_indent(out, indent);
+            fprintf(out, "return 0;\n");
+            gen_indent(out, indent);
+            fprintf(out, "}\n");
+            break;
+        case AST_UNTIL:
+            gen_indent(out, indent);
+            fprintf(out, "while(!(");
+            gen_expr(ast->until_stmt.cond, out);
+            fprintf(out, ")){\n");
+            gen_block(ast->until_stmt.body, out, indent + 1);
+            gen_indent(out, indent);
+            fprintf(out, "}\n");
+            break;
         case AST_PUSH: {
             gen_indent(out, indent);
             fprintf(out, "ado_push(&");
@@ -294,18 +409,38 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
         case AST_BLOCK:
             gen_block(ast, out, indent);
             break;
-        case AST_MATCH:
+        case AST_MATCH: {
+            int n = next_temp();
             gen_indent(out, indent);
-            fprintf(out, "if(0){/*match stub*/}\n");
-            break;
-        case AST_ENUM:
-            gen_indent(out, indent);
-            fprintf(out, "/* enum %s: ", ast->enum_def.enum_name);
-            for (int i = 0; i < ast->enum_def.variant_count; i++) {
-                fprintf(out, "%s", ast->enum_def.variants[i]->var_name);
-                if (i < ast->enum_def.variant_count - 1) fprintf(out, ", ");
+            fprintf(out, "__auto_type _ado_match_%d=", n);
+            gen_expr(ast->match_stmt.expr, out);
+            fprintf(out, ";\n");
+            int emitted_default = 0;
+            for (int i = 0; i < ast->match_stmt.arm_count; i++) {
+                AST *arm = ast->match_stmt.arms[i];
+                if (arm->match_arm.is_default) {
+                    if (!emitted_default) {
+                        gen_indent(out, indent);
+                        fprintf(out, "else{\n");
+                        gen_stmt_as_body(arm->match_arm.body, out, indent + 1);
+                        gen_indent(out, indent);
+                        fprintf(out, "}\n");
+                        emitted_default = 1;
+                    }
+                    continue;
+                }
+                gen_indent(out, indent);
+                fprintf(out, i == 0 ? "if(" : "else if(");
+                fprintf(out, "_ado_match_%d==", n);
+                gen_expr(arm->match_arm.pattern, out);
+                fprintf(out, "){\n");
+                gen_stmt_as_body(arm->match_arm.body, out, indent + 1);
+                gen_indent(out, indent);
+                fprintf(out, "}\n");
             }
-            fprintf(out, " */\n");
+            break;
+        }
+        case AST_ENUM:
             break;
         default:
             gen_indent(out, indent);
@@ -333,7 +468,7 @@ void codegen(AST *ast, FILE *out) {
     fprintf(out, "static int ado_min(int a, int b) { return a<b?a:b; }\n");
     fprintf(out, "static int ado_max(int a, int b) { return a>b?a:b; }\n");
     fprintf(out, "static int ado_clamp(int x, int l, int h) { return x<l?l:(x>h?h:x); }\n");
-    fprintf(out, "static int ado_pow(int b, int e) { int r=1; for(int i=0;i<e;i++) r*=b; return r; }\n");
+    fprintf(out, "static int ado_pow(int b, int e) { int r=1; while(e){if(e&1)r*=b;b*=b;e>>=1;} return r; }\n");
     fprintf(out, "static int ado_sign(int x) { return x>0?1:(x<0?-1:0); }\n");
     fprintf(out, "static int ado_is_even(int x) { return x%%2==0; }\n");
     fprintf(out, "static int ado_is_odd(int x) { return x%%2!=0; }\n");
@@ -378,9 +513,22 @@ void codegen(AST *ast, FILE *out) {
     fprintf(out, "static int ado_capacity(AdoArray a) { return a.cap; }\n");
     fprintf(out, "static int ado_reserve(AdoArray *a, int c) { if(c>a->cap){a->cap=c;a->data=realloc(a->data,c*4);} return 0; }\n");
     fprintf(out, "static int ado_shrink_to_fit(AdoArray *a) { if(a->cap>a->len){a->cap=a->len;a->data=realloc(a->data,a->cap*4);} return 0; }\n");
-    fprintf(out, "static int ado_sort(AdoArray a) { for(int i=0;i<a.len-1;i++){for(int j=i+1;j<a.len;j++){if(a.data[i]>a.data[j]){int t=a.data[i];a.data[i]=a.data[j];a.data[j]=t;}}} return 0; }\n");
-    fprintf(out, "static AdoArray ado_unique(AdoArray a) { AdoArray r=ado_make_array((int[]){},a.len); for(int i=0;i<a.len;i++){int f=0;for(int j=0;j<r.len;j++){if(r.data[j]==a.data[i]){f=1;break;}} if(!f)r.data[r.len++]=a.data[i];} return r; }\n");
+    fprintf(out, "static void ado_qsort(int *d, int lo, int hi) { if(lo>=hi) return; int p=d[hi],i=lo-1,j,t; for(j=lo;j<hi;j++){if(d[j]<=p){i++;t=d[i];d[i]=d[j];d[j]=t;}} t=d[i+1];d[i+1]=d[hi];d[hi]=t; ado_qsort(d,lo,i); ado_qsort(d,i+2,hi); }\n");
+    fprintf(out, "static int ado_sort(AdoArray a) { if(a.len>1) ado_qsort(a.data,0,a.len-1); return 0; }\n");
+    fprintf(out, "static AdoArray ado_unique(AdoArray a) { if(a.len<=1){AdoArray r=ado_make_array((int[]){},a.len); for(int i=0;i<a.len;i++)r.data[i]=a.data[i]; r.len=a.len; return r;} ado_sort(a); AdoArray r=ado_make_array((int[]){},a.len); r.data[r.len++]=a.data[0]; for(int i=1;i<a.len;i++){if(a.data[i]!=a.data[i-1])r.data[r.len++]=a.data[i];} return r; }\n");
     fprintf(out, "static int ado_reflect(AdoArray a) { printf(\"Array(len=%%d,cap=%%d)\",a.len,a.cap); return 0; }\n");
+    
+    for (int i = 0; i < ast->block.count; i++) {
+        AST *node = ast->block.stmts[i];
+        if (node->type == AST_ENUM) {
+            fprintf(out, "enum %s {", node->enum_def.enum_name);
+            for (int j = 0; j < node->enum_def.variant_count; j++) {
+                if (j > 0) fprintf(out, ",");
+                fprintf(out, "%s=%d", node->enum_def.variants[j]->var_name, j);
+            }
+            fprintf(out, "};\n");
+        }
+    }
     
     int has_main = 0;
     

@@ -5,7 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOC="$(dirname "$SCRIPT_DIR")/doc"
 
-BENCHMARKS=("fib" "prime" "collatz")
+BENCHMARKS=("fib" "prime" "collatz" "sort" "array_ops" "sumloop" "ackermann")
 ADO_TOTAL=0
 C_TOTAL=0
 PASS=0

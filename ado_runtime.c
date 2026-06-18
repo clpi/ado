@@ -45,8 +45,10 @@ int ado_clamp(int x, int lo, int hi) {
 
 int ado_pow(int base, int exp) {
     int result = 1;
-    for (int i = 0; i < exp; i++) {
-        result *= base;
+    while (exp) {
+        if (exp & 1) result *= base;
+        base *= base;
+        exp >>= 1;
     }
     return result;
 }
@@ -401,16 +403,23 @@ AdoArray ado_group_by(AdoArray a, int key_func_idx) {
     return a;
 }
 
-int ado_sort(AdoArray *a) {
-    for (int i = 0; i < a->len - 1; i++) {
-        for (int j = i + 1; j < a->len; j++) {
-            if (a->data[i] > a->data[j]) {
-                int t = a->data[i];
-                a->data[i] = a->data[j];
-                a->data[j] = t;
-            }
+static void ado_qsort(int *d, int lo, int hi) {
+    if (lo >= hi) return;
+    int pivot = d[hi];
+    int i = lo - 1;
+    for (int j = lo; j < hi; j++) {
+        if (d[j] <= pivot) {
+            i++;
+            int t = d[i]; d[i] = d[j]; d[j] = t;
         }
     }
+    int t = d[i + 1]; d[i + 1] = d[hi]; d[hi] = t;
+    ado_qsort(d, lo, i);
+    ado_qsort(d, i + 2, hi);
+}
+
+int ado_sort(AdoArray *a) {
+    if (a->len > 1) ado_qsort(a->data, 0, a->len - 1);
     return 0;
 }
 
@@ -435,10 +444,18 @@ AdoArray ado_bsort(AdoArray a) {
 }
 
 AdoArray ado_unique(AdoArray a) {
-    AdoArray r = ado_make_array((int[]){}, 0);
-    for (int i = 0; i < a.len; i++) {
-        if (ado_count_if(r, a.data[i]) == 0) {
-            ado_push(&r, a.data[i]);
+    if (a.len <= 1) {
+        AdoArray r = ado_make_array((int[]){}, a.len);
+        for (int i = 0; i < a.len; i++) r.data[i] = a.data[i];
+        r.len = a.len;
+        return r;
+    }
+    ado_sort(&a);
+    AdoArray r = ado_make_array((int[]){}, a.len);
+    r.data[r.len++] = a.data[0];
+    for (int i = 1; i < a.len; i++) {
+        if (a.data[i] != a.data[i - 1]) {
+            r.data[r.len++] = a.data[i];
         }
     }
     return r;

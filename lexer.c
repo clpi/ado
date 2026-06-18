@@ -45,13 +45,14 @@ static TokenType kw_lookup(const char *s, int len) {
             if (s[0] == 'a' && s[1] == 'n' && s[2] == 'd') return TOK_AND;
             if (s[0] == 'l' && s[1] == 'e' && s[2] == 'n') return TOK_LEN;
             if (s[0] == 'h' && s[1] == 'i' && s[2] == 'n') return TOK_HINT;
-            if (s[0] == 'e' && s[1] == 'n' && s[2] == 'u') return TOK_ENUM;
-            if (s[0] == 'm' && s[1] == 'a' && s[2] == 't') return TOK_MATCH;
             break;
         case 4:
             if (s[0] == 'e' && s[1] == 'l' && s[2] == 's' && s[3] == 'e') return TOK_ELSE;
             if (s[0] == 't' && s[1] == 'r' && s[2] == 'u' && s[3] == 'e') return TOK_TRUE;
             if (s[0] == 'p' && s[1] == 'u' && s[2] == 's' && s[3] == 'h') return TOK_PUSH;
+            if (s[0] == 'h' && s[1] == 'i' && s[2] == 'n' && s[3] == 't') return TOK_HINT;
+            if (s[0] == 'e' && s[1] == 'n' && s[2] == 'u' && s[3] == 'm') return TOK_ENUM;
+            if (s[0] == 's' && s[1] == 'w' && s[2] == 'a' && s[3] == 'p') return TOK_SWAP;
             break;
         case 5:
             if (s[0] == 'w' && s[1] == 'h' && s[2] == 'i' && s[3] == 'l' && s[4] == 'e') return TOK_WHILE;
@@ -59,6 +60,10 @@ static TokenType kw_lookup(const char *s, int len) {
             if (s[0] == 'p' && s[1] == 'r' && s[2] == 'i' && s[3] == 'n' && s[4] == 't') return TOK_PRINT;
             if (s[0] == 'b' && s[1] == 'r' && s[2] == 'e' && s[3] == 'a' && s[4] == 'k') return TOK_BREAK;
             if (s[0] == 't' && s[1] == 'y' && s[2] == 'p' && s[3] == 'e' && s[4] == 's') return TOK_TYPE;
+            if (s[0] == 'd' && s[1] == 'e' && s[2] == 'f' && s[3] == 'e' && s[4] == 'r') return TOK_DEFER;
+            if (s[0] == 'g' && s[1] == 'u' && s[2] == 'a' && s[3] == 'r' && s[4] == 'd') return TOK_GUARD;
+            if (s[0] == 'u' && s[1] == 'n' && s[2] == 't' && s[3] == 'i' && s[4] == 'l') return TOK_UNTIL;
+            if (s[0] == 'm' && s[1] == 'a' && s[2] == 't' && s[3] == 'c' && s[4] == 'h') return TOK_MATCH;
             break;
         case 6:
             if (s[0] == 'r' && s[1] == 'e' && s[2] == 't' && s[3] == 'u' && s[4] == 'r' && s[5] == 'n') return TOK_RETURN;
@@ -173,6 +178,7 @@ Token lexer_next(Lexer *lex) {
             break;
         case '=':
             if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_EQ; }
+            else if (lex->src[lex->pos] == '>') { lex->pos++; tok.type = TOK_FATARROW; }
             else tok.type = TOK_ASSIGN;
             break;
         case '!':

@@ -7,7 +7,7 @@ passed=0
 failed=0
 failed_files=""
 
-for file in example.do examples/*.do; do
+for file in example.do examples/*.do lib/*.do; do
     echo "Running $file..."
     ./doc "$file" >/dev/null 2>&1
     ret=$?
@@ -31,7 +31,10 @@ echo "========================================="
 
 echo ""
 echo "Running C unit tests..."
-if cc -o test_main test_main.c lexer.c parser.c codegen.c codegen_wasm.c -lcurl; then
+CC="${CC:-cc}"
+CFLAGS="${CFLAGS:--O2}"
+$CC $CFLAGS -o test_main test_main.c lexer.c parser.c codegen.c codegen_wasm.c -lcurl
+if [ $? -eq 0 ]; then
     ./test_main
     res=$?
     if [ $res -ne 0 ]; then
