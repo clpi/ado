@@ -626,7 +626,6 @@ static AST *parse_stmt(Parser *p) {
         advance(p);
         ast->push.val = parse_expr(p);
         advance(p);
-        advance(p);
         return ast;
     }
     if (p->cur.type == TOK_LBRACE) {

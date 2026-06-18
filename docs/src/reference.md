@@ -1,85 +1,269 @@
-# Ado Language Reference
+# Language Reference
 
-This document acts as a complete reference for the Ado programming language.
-
-## Basic Syntax
-
-Ado uses a C-like structure with curly braces `{}` and implicit semicolons. Statements do not require a trailing semicolon.
+Ado source files use the `.do` extension. The current compiler reads a `.do` file, builds an AST, emits C, compiles the C with `cc -O1`, and runs the resulting binary.
 
 ```ado
-# Ado code is clean and minimalistic
-let x = 10
+fn main() {
+  let n = 10
+  print("Factorial", factorial(n))
+  return 0
+}
+
+fn factorial(n) {
+  if n <= 1 {
+    return 1
+  }
+  return n * factorial(n - 1)
+}
+```
+
+## Source layout
+
+Ado programs are made of top-level function declarations and statements. Statements do not use trailing semicolons.
+
+```ado
+let x = 1
 print(x)
+
+fn helper(n) {
+  return n + 1
+}
 ```
 
-## Comments
+Blocks are delimited with `{` and `}`. Indentation is not syntactically significant, but two spaces are the project convention.
 
-Only single-line comments are supported, starting with `#`.
+## Lexical syntax
+
+### Comments
+
+Single-line comments start with `#` and run to the end of the line.
 
 ```ado
-# This is a comment
-let a = 1 # This is an inline comment
+# A standalone comment
+let x = 1 # An inline comment
 ```
 
-## Data Types
+Block comments are not supported.
 
-Currently, Ado focuses exclusively on numeric processing and primarily supports integers.
+### Identifiers
 
-- **Integers**: Ado supports positive and negative integer literals (e.g., `42`, `-10`).
-- **Arrays**: Ado supports integer arrays. They are zero-indexed and act mostly like C arrays under the hood. You can define arrays with `[val1, val2]`.
-- **Strings (Limited)**: Strings like `"hello"` can be used as arguments to the `print` function but cannot currently be assigned to variables or manipulated.
-- **Booleans**: `true` and `false` literals exist primarily within `if` and `while` expression evaluation context.
-
-## Variables
-
-Variables are statically bound within their block scopes. They are introduced with the `let` keyword.
+Identifiers start with a letter or underscore and may contain letters, digits, and underscores.
 
 ```ado
-let answer = 42
-let default_val = 0
+let total_count = 0
+let _private = 1
 ```
 
-## Operators
+Identifiers are case-sensitive.
 
-Ado supports a standard array of operators.
+### Numbers
 
-### Arithmetic Operators
-- `+` : Addition
-- `-` : Subtraction
-- `*` : Multiplication
-- `/` : Division (integer division)
-- `%` : Modulo
+Ado accepts decimal, hexadecimal, and binary integer literals. Negative numbers are parsed as unary minus.
 
-### Comparison Operators
-- `==` : Equal to
-- `!=` : Not equal to
-- `<` : Less than
-- `>` : Greater than
-- `<=` : Less than or equal to
-- `>=` : Greater than or equal to
+```ado
+let decimal = 42
+let hex = 0x2a
+let binary = 0b101010
+let negative = -10
+```
 
-### Logical Operators
-- `and` : Logical AND
-- `or` : Logical OR
-- `not` : Logical NOT
+All numeric operations use signed C `int` arithmetic.
 
-## Rare but Useful Language Features
+### Strings
 
-Ado includes a few compact features that are uncommon in small systems languages but useful for writing safer, clearer programs.
+String literals support `\"`, `\\`, `\n`, and `\t` escapes. Strings are currently intended for `print` arguments and generated C format fragments rather than a full string value type.
 
-### Safe Array Indexing
+```ado
+print("hello")
+print("line\nbreak")
+```
 
-`arr?idx` returns `arr[idx]` when `idx` is in bounds and `0` otherwise. Add `:fallback` to choose another default value.
+### Booleans
+
+`true` and `false` are boolean literals. They are emitted as integer `1` and `0`.
+
+```ado
+let ready = true
+if ready {
+  print("ready")
+}
+```
+
+## Values and types
+
+Ado is integer-first. The implemented value categories are:
+
+| Category | Syntax | Notes |
+|----------|--------|-------|
+| Integers | `0`, `42`, `-3`, `0x2a`, `0b1010` | Stored and operated on as C `int`. |
+| Booleans | `true`, `false` | Represented as `1` and `0`. |
+| Arrays | `[1, 2, 3]`, `[]` | Dynamic integer arrays backed by the Ado runtime array struct. |
+| Strings | `"text"` | Limited literal support, mainly for `print`. |
+
+Ado does not currently have floating-point numbers, structs, dictionaries, modules, packages, first-class functions, or a static type checker.
+
+## Variables and assignments
+
+Variables are introduced with `let`.
+
+```ado
+let x = 10
+let y = x + 5
+y = 20
+```
+
+Variables are mutable bindings. The compiler emits them with C's `__auto_type`, so the generated type follows the initializer or assignment target.
+
+### Optional type hints
+
+Ado accepts type hints on variables, but the current code generator treats them as hints only.
+
+```ado
+let x:Int = 1
+let y::Int = 2
+```
+
+`:` marks an optional hint. `::` marks a required hint. Neither changes generated C today.
+
+### Destructuring
+
+The LSP and Tree-sitter grammar recognize destructuring syntax, but code generation does not yet implement it.
+
+```ado
+let [a, b, ...rest] = values # Tooling-only today
+```
+
+## Expressions
+
+Expressions include literals, identifiers, function calls, array operations, arithmetic, comparisons, logical operators, ranges, slices, safe indexing, and pipe-forward.
+
+### Function calls
+
+```ado
+print("sum", sum([1, 2, 3]))
+let doubled = helper(x)
+```
+
+`print`, `len`, and `push` are parsed specially by the compiler. Other built-ins are rewritten to `ado_*` runtime helpers.
+
+### Array literals and indexing
+
+Arrays are zero-indexed.
 
 ```ado
 let arr = [10, 20, 30]
-print(arr?1)      # 20
-print(arr?9:-1)   # -1
+print(arr[0]) # 10
+arr[1] = 25
 ```
 
-### Negative Branching
+### Safe indexing
 
-`unless condition { } else { }` is the inverse of `if`.
+`arr?idx` returns `arr[idx]` when `idx` is in bounds, otherwise `0`. Add `:fallback` to choose another default.
+
+```ado
+let arr = [10, 20, 30]
+print(arr?1)    # 20
+print(arr?9)    # 0
+print(arr?9:-1) # -1
+```
+
+### Slices
+
+`arr[start..end]` returns a new array containing elements from `start` through `end - 1`.
+
+```ado
+let arr = [10, 20, 30, 40]
+let middle = arr[1..3] # [20, 30]
+```
+
+### Range literals
+
+An integer range literal `start..end` creates an array containing `start` through `end`, inclusive.
+
+```ado
+let nums = 1..3 # [1, 2, 3]
+```
+
+This differs from `for i in start..end`, where `end` is exclusive.
+
+### Pipe-forward
+
+`value |> fn` rewrites to `fn(value)`.
+
+```ado
+fn double(n) {
+  return n * 2
+}
+
+let x = 5 |> double # double(5)
+```
+
+The right side currently expects a function name.
+
+## Operators
+
+### Arithmetic
+
+| Operator | Meaning |
+|----------|---------|
+| `+` | Addition |
+| `-` | Subtraction or unary negation |
+| `*` | Multiplication |
+| `/` | Integer division |
+| `%` | Modulo |
+
+### Comparison
+
+| Operator | Meaning |
+|----------|---------|
+| `==` | Equal |
+| `!=` | Not equal |
+| `<` | Less than |
+| `>` | Greater than |
+| `<=` | Less than or equal |
+| `>=` | Greater than or equal |
+
+Comparisons can be chained.
+
+```ado
+if 0 < x < 10 {
+  print("x is between 0 and 10")
+}
+```
+
+### Logical
+
+| Operator | Meaning |
+|----------|---------|
+| `and` | Logical AND |
+| `or` | Logical OR |
+| `not` | Logical NOT |
+
+### Special
+
+| Operator | Meaning |
+|----------|---------|
+| `..` | Range literal or slice delimiter |
+| `...` | Recognized by tooling for spread/rest syntax |
+| `=>` | Match arm separator |
+| `|>` | Pipe-forward |
+| `?` | Safe array index |
+
+## Control flow
+
+### `if` / `else`
+
+```ado
+if x > 0 {
+  print("positive")
+} else {
+  print("not positive")
+}
+```
+
+### `unless`
+
+`unless condition { }` runs the block when the condition is false.
 
 ```ado
 unless done {
@@ -89,77 +273,99 @@ unless done {
 }
 ```
 
-### Parallel Swap
+### `guard`
 
-`swap a, b` exchanges two assignable expressions without a temporary variable in Ado source.
-
-```ado
-let a = 1
-let b = 2
-swap a, b
-print(a, b) # 2 1
-```
-
-### Runtime Assertions
-
-`assert expr` exits the program when `expr` is false.
+`guard condition else { body }` runs `body` and returns `0` when `condition` is false.
 
 ```ado
-let n = len(items)
-assert n > 0
+guard count > 0 else {
+  print("empty")
+  return 1
+}
 ```
 
-### Infinite Loops and Explicit Flow Control
+### `while`
 
-`forever { }` creates an intentionally unbounded loop. Use `break` and `continue` to leave or restart the current loop.
+```ado
+let i = 0
+while i < 5 {
+  print(i)
+  i = i + 1
+}
+```
+
+### `until`
+
+`until condition { }` loops while `condition` is false.
+
+```ado
+let total = 0
+until total >= 10 {
+  total = total + 1
+}
+```
+
+### `forever`
+
+`forever { }` creates an infinite loop. Use `break` and `continue`.
 
 ```ado
 forever {
   if done {
     break
   }
-  if skip_step {
+  if skip {
     continue
   }
 }
 ```
 
-## Control Flow
+### `for`
 
-### If / Else
-Ado uses `if` and `else` for branching. Conditionals must be followed by block braces.
+`for i in start..end` iterates from `start` to `end - 1`.
 
 ```ado
-if condition {
-  # code block
-} else {
-  # alternate code block
+for i in 0..5 {
+  print(i)
 }
 ```
 
-### While Loop
-The `while` loop repeatedly executes a block as long as a condition evaluates to true.
+### `match`
+
+`match` compares an expression against patterns using `==`. `_` is the default arm.
 
 ```ado
-while condition {
-  # loop body
+enum Status { ok, err }
+
+let status = ok
+match status {
+  ok => print("ok"),
+  err => print("err"),
+  _ => print("other")
 }
 ```
 
-### For Loop
-The `for` loop iterates over a range of integers. Note that the upper bound is exclusive.
+Match arms can contain a statement, a block, or an expression.
+
+### `break` and `continue`
+
+`break` exits the current loop. `continue` jumps to the next loop iteration.
 
 ```ado
-for i in 1..10 {
-  # iterates from 1 to 9
+for i in 0..10 {
+  if i == 3 {
+    continue
+  }
+  if i == 7 {
+    break
+  }
   print(i)
 }
 ```
 
 ## Functions
 
-Functions are defined with the `fn` keyword. The `main` function is the entry point of any executable Ado program.
-Functions can return values using the `return` keyword.
+Functions are declared with `fn`.
 
 ```ado
 fn add(a, b) {
@@ -172,162 +378,222 @@ fn main() {
 }
 ```
 
-## Built-in Functions
+Function parameters are untyped identifiers. Return values use `return`. Non-`main` functions implicitly return `0` if control reaches the end of the generated C function.
 
-### `print(...)`
-The `print` function takes one or more arguments separated by commas and prints them to the console, followed by a newline.
-
-```ado
-print("The value is:", 42)
-```
-
-### `len(arr)`
-The `len` function returns the length of a given array.
-
-```ado
-let arr = [1, 2, 3]
-print(len(arr)) # Prints 3
-```
-
-### `push(arr, val)`
-The `push` function pushes a value onto the end of a given array.
-
-```ado
-let arr = []
-push(arr, 5)
-push(arr, 10)
-print(arr[1]) # Prints 10
-```
-
-## HTTP Stdlib
-
-Ado can call HTTP endpoints directly from `main()`. The response body is printed to stderr, while the function’s return value is the numeric HTTP status code. You need libcurl installed and the program must be linked with `-lcurl`.
-
-| Function | Description | Example | Returns |
-|----------|-------------|---------|---------|
-| `http_get(url)` | GET request | `http_get("https://httpbin.org/get")` | `200` |
-| `http_post(url, body)` | POST request | `http_post("https://httpbin.org/post", "hello")` | `200` |
-| `http_put(url, body)` | PUT request | `http_put("https://httpbin.org/put", "hello")` | `200` |
-| `http_delete(url)` | DELETE request | `http_delete("https://httpbin.org/delete")` | `200` |
-| `http_status(url)` | GET and return status only | `http_status("https://httpbin.org/status/418")` | `418` |
-
-Use in `main()`:
+`main` is the program entry point and its return value becomes the process exit code.
 
 ```ado
 fn main() {
-  let code = http_get("https://httpbin.org/get")
+  return 0
+}
+```
+
+Ado does not currently support first-class functions or function pointers.
+
+## Enums
+
+Enums emit C enum constants.
+
+```ado
+enum Color { red, green, blue }
+
+fn main() {
+  let c = green
+  match c {
+    red => print("red"),
+    green => print("green"),
+    blue => print("blue"),
+    _ => print("unknown")
+  }
+  return 0
+}
+```
+
+Enum variant names are in the C enum namespace.
+
+## Assertions, defer, and swap
+
+### Assertions
+
+`assert expr` exits with status `1` and prints `Ado assertion failed` when `expr` is false.
+
+```ado
+let n = len([1, 2, 3])
+assert n == 3
+```
+
+### Deferred execution
+
+`defer statement` runs a statement when the surrounding C scope exits.
+
+```ado
+defer print("cleanup")
+{
+  defer print("inner cleanup")
+}
+```
+
+### Parallel swap
+
+`swap a, b` exchanges two assignable expressions.
+
+```ado
+let a = 1
+let b = 2
+swap a, b
+print(a, b) # 2 1
+```
+
+## Compiler hints
+
+The lexer recognizes `@hint` tokens and the help text mentions hints such as `@inline` and `@memo`, but current code generation does not apply optimization or memoization from these hints.
+
+```ado
+@inline
+fn fast(n) {
+  return n + 1
+}
+```
+
+Treat compiler hints as accepted syntax for future tooling unless the compiler is extended.
+
+## Standard library and built-ins
+
+### Core functions
+
+| Function | Syntax | Returns | Notes |
+|----------|--------|---------|-------|
+| `print` | `print(a, b, ...)` | `void` | Prints values separated by spaces and a newline. String literals become format text. |
+| `len` | `len(arr)` | `int` | Array length. |
+| `push` | `push(arr, value)` | `void` | Appends to an array. |
+
+### Math helpers
+
+| Function | Meaning |
+|----------|---------|
+| `abs(x)` | Absolute value |
+| `min(a, b)` | Minimum |
+| `max(a, b)` | Maximum |
+| `clamp(x, lo, hi)` | Clamp to inclusive range |
+| `pow(base, exp)` | Integer exponentiation |
+| `sign(x)` | `-1`, `0`, or `1` |
+| `is_even(x)` | `1` if even |
+| `is_odd(x)` | `1` if odd |
+| `gcd(a, b)` | Greatest common divisor |
+| `lcm(a, b)` | Least common multiple |
+| `factorial(n)` | Factorial |
+| `fib(n)` | Fibonacci number at index `n` |
+
+### Array helpers
+
+| Function | Meaning |
+|----------|---------|
+| `sum(arr)` | Sum of elements |
+| `avg(arr)` | Integer average |
+| `contains(arr, value)` | `1` if value exists |
+| `find(arr, value)` | First index or `-1` |
+| `count_if(arr, value)` | Number of matching elements |
+| `all(arr)` | `1` if all elements are truthy |
+| `any(arr)` | `1` if any element is truthy |
+| `pop(arr)` | Remove and return last element |
+| `reverse(arr)` | Reverse in place |
+| `remove(arr, index)` | Remove element at index |
+| `insert(arr, index, value)` | Insert at index |
+| `take(arr, count)` | New array with first `count` elements |
+| `drop(arr, count)` | New array without first `count` elements |
+| `concat(a, b)` | New concatenated array |
+| `fill(count, value)` | New array with repeated value |
+| `filter(arr, value)` | New array without matching value |
+| `sort(arr)` | Sort in place |
+| `unique(arr)` | New deduplicated array |
+
+### Capacity and reflection
+
+| Function | Meaning |
+|----------|---------|
+| `capacity(arr)` | Current allocated capacity |
+| `reserve(arr, capacity)` | Reserve capacity |
+| `shrink_to_fit(arr)` | Shrink capacity to length |
+| `reflect(arr)` | Print array length and capacity |
+
+### File, environment, time, and process
+
+| Function | Meaning |
+|----------|---------|
+| `getenv(name)` | Print environment variable and return `1` if found, otherwise `0` |
+| `exit(code)` | Exit process |
+| `read_file(path)` | Print file contents and return `0` on success, `-1` on failure |
+| `write_file(path, value)` | Write an integer to a file |
+| `file_exists(path)` | Return `1` if file exists |
+| `sleep(ms)` | Sleep for milliseconds |
+| `time()` | Current Unix timestamp |
+| `random(max)` | Random integer in `[0, max)` |
+
+### HTTP helpers
+
+HTTP helpers require libcurl. Response bodies are printed to stderr. Return values are HTTP status codes or `-1` on failure.
+
+| Function | Meaning |
+|----------|---------|
+| `http_get(url)` | GET request |
+| `http_post(url, body)` | POST request |
+| `http_put(url, body)` | PUT request |
+| `http_delete(url)` | DELETE request |
+| `http_status(url)` | GET request and return status only |
+
+```ado
+fn main() {
+  let code = http_status("https://httpbin.org/status/204")
   print(code)
   return 0
 }
 ```
 
-Notes:
-- Response bodies are printed to stderr.
-- `http_*` is not safe for stdin/shell pipelines.
-- If you need a shell result, capture it in Ado and pass it into HTTP; `http_*` is for outbound network calls.
+## Compiler and targets
 
-## Standard Library
+### Build and run
 
-Ado includes an inline standard library with math and array helpers. All functions use the `ado_` prefix to avoid conflicts with user-defined functions.
-
-### Array Functions
-
-| Function | Description | Example | Result |
-|----------|-------------|---------|--------|
-| `ado_contains(arr, val)` | Check if array contains value | `ado_contains([1,2,3], 2)` | `1` (true) |
-| `ado_pop(arr)` | Remove and return last element | `ado_pop([10, 20, 30])` | `30` |
-| `ado_reverse(arr)` | Reverse array in place | `ado_reverse([1,2,3])` | array becomes `[3,2,1]` |
-| `ado_remove(arr, idx)` | Remove element at index | `ado_remove([1,2,3], 1)` | `[1,3]` |
-| `ado_insert(arr, idx, val)` | Insert value at index | `ado_insert([1,3], 1, 2)` | `[1,2,3]` |
-| `ado_sum(arr)` | Sum all elements | `ado_sum([1,2,3])` | `6` |
-| `ado_avg(arr)` | Average of elements | `ado_avg([1,2,3,4])` | `2` |
-| `ado_factorial(n)` | Factorial | `ado_factorial(5)` | `120` |
-| `ado_fib(n)` | Fibonacci (0-indexed) | `ado_fib(10)` | `55` |
-| `ado_count_if(arr, val)` | Count occurrences | `ado_count_if([1,2,2,3], 2)` | `2` |
-| `ado_filter(arr, val)` | New array without value | `ado_filter([1,2,1,3], 1)` | `[2,3]` |
-| `ado_find(arr, val)` | First index or -1 | `ado_find([1,2,3], 2)` | `1` |
-| `ado_all(arr)` | All truthy | `ado_all([1,0,1])` | `0` |
-| `ado_any(arr)` | Any truthy | `ado_any([0,0,1])` | `1` |
-
-### Array Transform Functions
-
-These return new arrays without mutating the input:
-
-```ado
-let arr = [1, 2, 3, 4, 5]
-let first3 = ado_take(arr, 3)     # [1, 2, 3]
-let rest = ado_drop(arr, 2)       # [3, 4, 5]
-let doubled = ado_map(arr, ado_fib)  # not yet implemented in v1
-let merged = ado_concat([1,2], [3,4]) # [1,2,3,4]
-let zeros = ado_fill(5, 0)        # [0, 0, 0, 0, 0]
+```bash
+make
+./doc file.do
 ```
 
-### Math Functions
+`./doc file.do` writes generated C to a temporary directory, compiles it with `cc -O1`, runs the binary, then removes the temporary files.
 
-| Function | Description | Example | Result |
-|----------|-------------|---------|--------|
-| `ado_abs(x)` | Absolute value | `ado_abs(-5)` | `5` |
-| `ado_min(a, b)` | Minimum of two values | `ado_min(3, 7)` | `3` |
-| `ado_max(a, b)` | Maximum of two values | `ado_max(3, 7)` | `7` |
-| `ado_clamp(x, lo, hi)` | Clamp x between lo and hi | `ado_clamp(5, 0, 10)` | `5` |
-| `ado_pow(base, exp)` | Integer exponentiation | `ado_pow(2, 10)` | `1024` |
-| `ado_sign(x)` | Sign of x (-1, 0, or 1) | `ado_sign(-10)` | `-1` |
-| `ado_is_even(x)` | True if x is even | `ado_is_even(4)` | `1` |
-| `ado_is_odd(x)` | True if x is odd | `ado_is_odd(7)` | `1` |
-| `ado_gcd(a, b)` | Greatest common divisor | `ado_gcd(12, 8)` | `4` |
-| `ado_lcm(a, b)` | Least common multiple | `ado_lcm(6, 4)` | `12` |
+### Install
 
-## Functional Programming
-
-Ado supports basic functional patterns through its stdlib:
-
-```ado
-fn is_even(n) {
-  return ado_is_even(n)
-}
-
-fn main() {
-  let nums = [1, 2, 3, 4, 5, 6]
-  let evens = ado_filter(nums, 0)
-  let sum_sq = 0
-  let i = 0
-  while i < len(evens) {
-    sum_sq = sum_sq + (evens[i] * evens[i])
-    i = i + 1
-  }
-  print(sum_sq)
-  return 0
-}
+```bash
+sudo make install
+ado file.do
+ado-lsp
 ```
 
-Higher-order functions like `map` and `reduce` can be implemented using loops since Ado does not yet support function pointers as first-class values.
+The install target installs `ado` and `ado-lsp` into `$(PREFIX)/bin`.
 
-## Array Index Assignment
+### WebAssembly target
 
-Arrays support element assignment using bracket notation:
+The compiler can emit WebAssembly text format.
 
-```ado
-let arr = [10, 20, 30]
-arr[0] = 99
-print(arr[0]) # Prints 99
+```bash
+./doc --target wasm examples/stdlib.do
+wat2wasm examples/stdlib.do.wat -o examples/stdlib.do.wasm
+wasmtime examples/stdlib.do.wasm
 ```
 
-## Compilation Process
+The Makefile provides the same flow:
 
-1. **Lexing**: Source text is broken into tokens.
-2. **Parsing**: Tokens are organized into an Abstract Syntax Tree (AST).
-3. **Code Generation**: The AST is transpiled directly to C code.
-4. **C Compilation**: A standard C compiler compiles the result to a native executable with `-O2` optimization for speed.
-
-### Nested Control Flow
-You can nest `if` statements and loops as needed.
-
-```ado
-for i in 1..5 {
-  if i % 2 == 0 {
-    print(i, "is even")
-  } else {
-    print(i, "is odd")
-  }
-}
+```bash
+make wasm
 ```
+
+WASM support depends on the current `codegen_wasm.c` implementation and external tools such as `wat2wasm` and a WASI runtime.
+
+## Implementation notes and limitations
+
+- Generated C uses `__auto_type`, so a GCC or Clang-compatible compiler is expected.
+- The runtime uses libcurl for HTTP helpers.
+- Arrays are dynamic integer arrays, not multi-dimensional or generic containers.
+- Strings are not a complete value type yet.
+- Type hints and compiler hints are parsed but do not affect generated C yet.
+- The LSP and Tree-sitter grammar recognize some future-facing syntax, such as destructuring and list comprehensions, but code generation does not currently implement those features.
+- There is no module system, package manager, floating-point type, struct type, dictionary type, or static type checker yet.

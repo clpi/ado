@@ -11,6 +11,107 @@ static int ado_defer_counter = 0;
 static int next_temp(void) { return ado_temp_counter++; }
 static int next_defer(void) { return ado_defer_counter++; }
 
+static int expr_uses_array(AST *body, const char *name);
+static int stmt_uses_array(AST *body, const char *name);
+
+static int expr_uses_array(AST *ast, const char *name) {
+    if (!ast) return 0;
+    switch (ast->type) {
+        case AST_VAR:
+            return 0; /* bare ref is not array-typed */
+        case AST_INDEX:
+            if (ast->index.arr->type == AST_VAR && strcmp(ast->index.arr->var_name, name) == 0) return 1;
+            return expr_uses_array(ast->index.arr, name) || expr_uses_array(ast->index.idx, name);
+        case AST_BINOP:
+            return expr_uses_array(ast->binop.left, name) || expr_uses_array(ast->binop.right, name);
+        case AST_UNARY:
+            return expr_uses_array(ast->unary.operand, name);
+        case AST_CALL:
+            for (int i = 0; i < ast->call.argc; i++)
+                if (expr_uses_array(ast->call.args[i], name)) return 1;
+            return 0;
+        case AST_LEN:
+            if (ast->len.arr->type == AST_VAR && strcmp(ast->len.arr->var_name, name) == 0) return 1;
+            return expr_uses_array(ast->len.arr, name);
+        case AST_SAFE_INDEX:
+            if (ast->safe_index.arr->type == AST_VAR && strcmp(ast->safe_index.arr->var_name, name) == 0) return 1;
+            return expr_uses_array(ast->safe_index.arr, name) || expr_uses_array(ast->safe_index.idx, name) || expr_uses_array(ast->safe_index.fallback, name);
+        case AST_SLICE:
+            if (ast->slice.arr->type == AST_VAR && strcmp(ast->slice.arr->var_name, name) == 0) return 1;
+            return expr_uses_array(ast->slice.arr, name);
+        case AST_ARRAY:
+            for (int i = 0; i < ast->array.count; i++)
+                if (expr_uses_array(ast->array.elems[i], name)) return 1;
+            return 0;
+        case AST_RANGE:
+            return expr_uses_array(ast->range.start, name) || expr_uses_array(ast->range.end, name);
+        default:
+            return 0;
+    }
+}
+
+static int stmt_uses_array(AST *ast, const char *name) {
+    if (!ast) return 0;
+    switch (ast->type) {
+        case AST_LET:
+            return expr_uses_array(ast->let.val, name);
+        case AST_IF:
+            return expr_uses_array(ast->if_stmt.cond, name) ||
+                   stmt_uses_array(ast->if_stmt.then, name) ||
+                   stmt_uses_array(ast->if_stmt.els, name);
+        case AST_WHILE:
+            return expr_uses_array(ast->while_stmt.cond, name) ||
+                   stmt_uses_array(ast->while_stmt.body, name);
+        case AST_FOR:
+            return expr_uses_array(ast->for_stmt.start, name) ||
+                   expr_uses_array(ast->for_stmt.end, name) ||
+                   stmt_uses_array(ast->for_stmt.body, name);
+        case AST_FOREVER:
+            return stmt_uses_array(ast->forever.body, name);
+        case AST_UNTIL:
+            return expr_uses_array(ast->until_stmt.cond, name) ||
+                   stmt_uses_array(ast->until_stmt.body, name);
+        case AST_RETURN:
+            return expr_uses_array(ast->ret.val, name);
+        case AST_BLOCK:
+            for (int i = 0; i < ast->block.count; i++)
+                if (stmt_uses_array(ast->block.stmts[i], name)) return 1;
+            return 0;
+        case AST_ASSIGN:
+            if (ast->assign.target->type == AST_INDEX && ast->assign.target->index.arr->type == AST_VAR &&
+                strcmp(ast->assign.target->index.arr->var_name, name) == 0) return 1;
+            return expr_uses_array(ast->assign.target, name) || expr_uses_array(ast->assign.val, name);
+        case AST_PUSH:
+            if (ast->push.arr->type == AST_VAR && strcmp(ast->push.arr->var_name, name) == 0) return 1;
+            return expr_uses_array(ast->push.arr, name) || expr_uses_array(ast->push.val, name);
+        case AST_PRINT:
+            for (int i = 0; i < ast->print.count; i++)
+                if (expr_uses_array(ast->print.vals[i], name)) return 1;
+            return 0;
+        case AST_ASSERT:
+            return expr_uses_array(ast->assert_stmt.expr, name);
+        case AST_DEFER:
+            return expr_uses_array(ast->defer_stmt.expr, name);
+        case AST_GUARD:
+            return expr_uses_array(ast->guard_stmt.cond, name) || stmt_uses_array(ast->guard_stmt.body, name);
+        case AST_MATCH:
+            if (expr_uses_array(ast->match_stmt.expr, name)) return 1;
+            for (int i = 0; i < ast->match_stmt.arm_count; i++)
+                if (stmt_uses_array(ast->match_stmt.arms[i], name)) return 1;
+            return 0;
+        case AST_MATCH_ARM:
+            return stmt_uses_array(ast->match_arm.body, name);
+        case AST_SWAP:
+            return expr_uses_array(ast->swap.left, name) || expr_uses_array(ast->swap.right, name);
+        default:
+            return 0;
+    }
+}
+
+static int param_is_array(AST *body, const char *name) {
+    return stmt_uses_array(body, name);
+}
+
 static void gen_indent(FILE *out, int indent);
 static void gen_stmt_as_body(AST *ast, FILE *out, int indent);
 
@@ -130,42 +231,6 @@ static void gen_expr(AST *ast, FILE *out) {
             else if (strcmp(name, "gcd") == 0) name = "ado_gcd";
             else if (strcmp(name, "lcm") == 0) name = "ado_lcm";
             else if (strcmp(name, "factorial") == 0) name = "ado_factorial";
-            else if (strcmp(name, "fib") == 0) name = "ado_fib";
-            else if (strcmp(name, "sum") == 0) name = "ado_sum";
-            else if (strcmp(name, "avg") == 0) name = "ado_avg";
-            else if (strcmp(name, "contains") == 0) name = "ado_contains";
-            else if (strcmp(name, "count_if") == 0) name = "ado_count_if";
-            else if (strcmp(name, "find") == 0) name = "ado_find";
-            else if (strcmp(name, "all") == 0) name = "ado_all";
-            else if (strcmp(name, "any") == 0) name = "ado_any";
-            else if (strcmp(name, "pop") == 0) name = "ado_pop";
-            else if (strcmp(name, "reverse") == 0) name = "ado_reverse";
-            else if (strcmp(name, "remove") == 0) name = "ado_remove";
-            else if (strcmp(name, "insert") == 0) name = "ado_insert";
-            else if (strcmp(name, "take") == 0) name = "ado_take";
-            else if (strcmp(name, "drop") == 0) name = "ado_drop";
-            else if (strcmp(name, "concat") == 0) name = "ado_concat";
-            else if (strcmp(name, "fill") == 0) name = "ado_fill";
-            else if (strcmp(name, "filter") == 0) name = "ado_filter";
-            else if (strcmp(name, "sort") == 0) name = "ado_sort";
-            else if (strcmp(name, "unique") == 0) name = "ado_unique";
-            else if (strcmp(name, "reflect") == 0) name = "ado_reflect";
-            else if (strcmp(name, "capacity") == 0) name = "ado_capacity";
-            else if (strcmp(name, "reserve") == 0) name = "ado_reserve";
-            else if (strcmp(name, "shrink_to_fit") == 0) name = "ado_shrink_to_fit";
-            else if (strcmp(name, "http_get") == 0) name = "ado_http_get";
-            else if (strcmp(name, "http_post") == 0) name = "ado_http_post";
-            else if (strcmp(name, "http_put") == 0) name = "ado_http_put";
-            else if (strcmp(name, "http_delete") == 0) name = "ado_http_delete";
-            else if (strcmp(name, "http_status") == 0) name = "ado_http_status";
-            else if (strcmp(name, "getenv") == 0) name = "ado_getenv";
-            else if (strcmp(name, "exit") == 0) name = "ado_exit";
-            else if (strcmp(name, "read_file") == 0) name = "ado_read_file";
-            else if (strcmp(name, "write_file") == 0) name = "ado_write_file";
-            else if (strcmp(name, "file_exists") == 0) name = "ado_file_exists";
-            else if (strcmp(name, "sleep") == 0) name = "ado_sleep";
-            else if (strcmp(name, "time") == 0) name = "ado_time";
-            else if (strcmp(name, "random") == 0) name = "ado_random";
             fprintf(out, "%s(", name);
             for (int i = 0; i < ast->call.argc; i++) {
                 gen_expr(ast->call.args[i], out);
@@ -476,7 +541,7 @@ void codegen(AST *ast, FILE *out) {
     fprintf(out, "static int ado_lcm(int a, int b) { return a/ado_gcd(a,b)*b; }\n");
     fprintf(out, "static int ado_contains(AdoArray a, int v) { for(int i=0;i<a.len;i++){if(a.data[i]==v)return 1;} return 0; }\n");
     fprintf(out, "static int ado_pop(AdoArray *a) { return a->data[--a->len]; }\n");
-    fprintf(out, "static int ado_reverse(AdoArray *a) { for(int i=0;i<a->len/2;i++){int t=a->data[i];a->data[i]=a->data[a->len-1-i];a->data[a->len-1-i]=t;} return 0; }\n");
+    fprintf(out, "static int ado_reverse(AdoArray a) { for(int i=0;i<a.len/2;i++){int t=a.data[i];a.data[i]=a.data[a.len-1-i];a.data[a.len-1-i]=t;} return 0; }\n");
     fprintf(out, "static int ado_remove(AdoArray *a, int i) { for(int j=i;j<a->len-1;j++)a->data[j]=a->data[j+1]; a->len--; return 0; }\n");
     fprintf(out, "static int ado_insert(AdoArray *a, int i, int v) { if(a->len>=a->cap){a->cap=a->cap?a->cap*2:4;a->data=realloc(a->data,a->cap*sizeof(int));} for(int j=a->len;j>i;j--)a->data[j]=a->data[j-1]; a->data[i]=v; a->len++; return 0; }\n");
     fprintf(out, "static int ado_factorial(int n) { int r=1; for(int i=2;i<=n;i++) r*=i; return r; }\n");
@@ -538,7 +603,8 @@ void codegen(AST *ast, FILE *out) {
             if (strcmp(node->fn.name, "main") == 0) has_main = 1;
             fprintf(out, "int %s(", node->fn.name);
             for (int j = 0; j < node->fn.paramc; j++) {
-                fprintf(out, "int %s", node->fn.params[j]);
+                int is_array = param_is_array(node->fn.body, node->fn.params[j]);
+                fprintf(out, "%s %s", is_array ? "AdoArray" : "int", node->fn.params[j]);
                 if (j < node->fn.paramc - 1) fprintf(out, ",");
             }
             fprintf(out, "){\n");

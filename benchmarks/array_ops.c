@@ -13,18 +13,16 @@ static void push(Array *a, int v) {
     a->data[a->len++] = v;
 }
 static int sum_arr(Array a) { int s = 0; for (int i = 0; i < a.len; i++) s += a.data[i]; return s; }
-static void reverse_arr(Array *a) { for (int i = 0; i < a->len / 2; i++) { int t = a->data[i]; a->data[i] = a->data[a->len - 1 - i]; a->data[a->len - 1 - i] = t; } }
-static int pop_arr(Array *a) { return a->data[--a->len]; }
+static void reverse_arr(Array a) { for (int i = 0; i < a.len / 2; i++) { int t = a.data[i]; a.data[i] = a.data[a.len - 1 - i]; a.data[a.len - 1 - i] = t; } }
 
 int main(void) {
     int n = 20000;
     Array arr = make_array((int[]){}, 0);
     for (int i = 0; i < n; i++) push(&arr, i);
     int total = sum_arr(arr);
-    reverse_arr(&arr);
+    reverse_arr(arr);
+    int check = arr.data[0];
     for (int i = 0; i < 1000; i++) push(&arr, i);
-    int popped = 0;
-    while (arr.len > 0) popped = pop_arr(&arr);
-    printf("total: %d popped: %d\n", total, popped);
+    printf("total: %d first: %d final_len: %d\n", total, check, arr.len);
     return total;
 }

@@ -30,52 +30,75 @@ static void skip_comment(Lexer *lex) {
     }
 }
 
+static inline unsigned kw_load2(const char *s) {
+    return ((unsigned char)s[0]) | ((unsigned char)s[1]<<8);
+}
+static inline unsigned kw_load3(const char *s) {
+    return ((unsigned char)s[0]) | ((unsigned char)s[1]<<8) | ((unsigned char)s[2]<<16);
+}
+static inline unsigned kw_load4(const char *s) {
+    return ((unsigned char)s[0]) | ((unsigned char)s[1]<<8) | ((unsigned char)s[2]<<16) | ((unsigned char)s[3]<<24);
+}
+
 static TokenType kw_lookup(const char *s, int len) {
     switch (len) {
-        case 2:
-            if (s[0] == 'f' && s[1] == 'n') return TOK_FN;
-            if (s[0] == 'i' && s[1] == 'f') return TOK_IF;
-            if (s[0] == 'i' && s[1] == 'n') return TOK_IN;
-            if (s[0] == 'o' && s[1] == 'r') return TOK_OR;
+        case 2: {
+            unsigned h = kw_load2(s);
+            if (h == 0x6e66) return TOK_FN;      // "fn"
+            if (h == 0x6669) return TOK_IF;      // "if"
+            if (h == 0x6e69) return TOK_IN;      // "in"
+            if (h == 0x726f) return TOK_OR;      // "or"
             break;
-        case 3:
-            if (s[0] == 'l' && s[1] == 'e' && s[2] == 't') return TOK_LET;
-            if (s[0] == 'f' && s[1] == 'o' && s[2] == 'r') return TOK_FOR;
-            if (s[0] == 'n' && s[1] == 'o' && s[2] == 't') return TOK_NOT;
-            if (s[0] == 'a' && s[1] == 'n' && s[2] == 'd') return TOK_AND;
-            if (s[0] == 'l' && s[1] == 'e' && s[2] == 'n') return TOK_LEN;
-            if (s[0] == 'h' && s[1] == 'i' && s[2] == 'n') return TOK_HINT;
+        }
+        case 3: {
+            unsigned h = kw_load3(s);
+            if (h == 0x74656c) return TOK_LET;   // "let"
+            if (h == 0x726f66) return TOK_FOR;   // "for"
+            if (h == 0x746f6e) return TOK_NOT;   // "not"
+            if (h == 0x646e61) return TOK_AND;   // "and"
+            if (h == 0x6e656c) return TOK_LEN;   // "len"
             break;
-        case 4:
-            if (s[0] == 'e' && s[1] == 'l' && s[2] == 's' && s[3] == 'e') return TOK_ELSE;
-            if (s[0] == 't' && s[1] == 'r' && s[2] == 'u' && s[3] == 'e') return TOK_TRUE;
-            if (s[0] == 'p' && s[1] == 'u' && s[2] == 's' && s[3] == 'h') return TOK_PUSH;
-            if (s[0] == 'h' && s[1] == 'i' && s[2] == 'n' && s[3] == 't') return TOK_HINT;
-            if (s[0] == 'e' && s[1] == 'n' && s[2] == 'u' && s[3] == 'm') return TOK_ENUM;
-            if (s[0] == 's' && s[1] == 'w' && s[2] == 'a' && s[3] == 'p') return TOK_SWAP;
+        }
+        case 4: {
+            unsigned h = kw_load4(s);
+            if (h == 0x65736c65) return TOK_ELSE;  // "else"
+            if (h == 0x65757274) return TOK_TRUE;  // "true"
+            if (h == 0x68737570) return TOK_PUSH;  // "push"
+            if (h == 0x746e6968) return TOK_HINT;  // "hint"
+            if (h == 0x6d756e65) return TOK_ENUM;  // "enum"
+            if (h == 0x70617773) return TOK_SWAP;  // "swap"
             break;
-        case 5:
-            if (s[0] == 'w' && s[1] == 'h' && s[2] == 'i' && s[3] == 'l' && s[4] == 'e') return TOK_WHILE;
-            if (s[0] == 'f' && s[1] == 'a' && s[2] == 'l' && s[3] == 's' && s[4] == 'e') return TOK_FALSE;
-            if (s[0] == 'p' && s[1] == 'r' && s[2] == 'i' && s[3] == 'n' && s[4] == 't') return TOK_PRINT;
-            if (s[0] == 'b' && s[1] == 'r' && s[2] == 'e' && s[3] == 'a' && s[4] == 'k') return TOK_BREAK;
-            if (s[0] == 't' && s[1] == 'y' && s[2] == 'p' && s[3] == 'e' && s[4] == 's') return TOK_TYPE;
-            if (s[0] == 'd' && s[1] == 'e' && s[2] == 'f' && s[3] == 'e' && s[4] == 'r') return TOK_DEFER;
-            if (s[0] == 'g' && s[1] == 'u' && s[2] == 'a' && s[3] == 'r' && s[4] == 'd') return TOK_GUARD;
-            if (s[0] == 'u' && s[1] == 'n' && s[2] == 't' && s[3] == 'i' && s[4] == 'l') return TOK_UNTIL;
-            if (s[0] == 'm' && s[1] == 'a' && s[2] == 't' && s[3] == 'c' && s[4] == 'h') return TOK_MATCH;
+        }
+        case 5: {
+            unsigned h = kw_load4(s);
+            if (h == 0x6c696877 && s[4]=='e') return TOK_WHILE;   // "while"
+            if (h == 0x736c6166 && s[4]=='e') return TOK_FALSE;   // "false"
+            if (h == 0x6e697270 && s[4]=='t') return TOK_PRINT;   // "print"
+            if (h == 0x61657262 && s[4]=='k') return TOK_BREAK;   // "break"
+            if (h == 0x65707974 && s[4]=='s') return TOK_TYPE;    // "types"
+            if (h == 0x65666564 && s[4]=='r') return TOK_DEFER;   // "defer"
+            if (h == 0x72617567 && s[4]=='d') return TOK_GUARD;   // "guard"
+            if (h == 0x69746e75 && s[4]=='l') return TOK_UNTIL;   // "until"
+            if (h == 0x6374616d && s[4]=='h') return TOK_MATCH;   // "match"
             break;
-        case 6:
-            if (s[0] == 'r' && s[1] == 'e' && s[2] == 't' && s[3] == 'u' && s[4] == 'r' && s[5] == 'n') return TOK_RETURN;
-            if (s[0] == 'a' && s[1] == 's' && s[2] == 's' && s[3] == 'e' && s[4] == 'r' && s[5] == 't') return TOK_ASSERT;
-            if (s[0] == 'u' && s[1] == 'n' && s[2] == 'l' && s[3] == 'e' && s[4] == 's' && s[5] == 's') return TOK_UNLESS;
+        }
+        case 6: {
+            unsigned h = kw_load4(s);
+            if (h == 0x75746572 && s[4]=='r' && s[5]=='n') return TOK_RETURN;  // "return"
+            if (h == 0x65737361 && s[4]=='r' && s[5]=='t') return TOK_ASSERT;  // "assert"
+            if (h == 0x656c6e75 && s[4]=='s' && s[5]=='s') return TOK_UNLESS;  // "unless"
             break;
-        case 7:
-            if (s[0] == 'f' && s[1] == 'o' && s[2] == 'r' && s[3] == 'e' && s[4] == 'v' && s[5] == 'e' && s[6] == 'r') return TOK_FOREVER;
+        }
+        case 7: {
+            unsigned h = kw_load4(s);
+            if (h == 0x65726f66 && s[4]=='v' && s[5]=='e' && s[6]=='r') return TOK_FOREVER; // "forever"
             break;
-        case 8:
-            if (s[0] == 'c' && s[1] == 'o' && s[2] == 'n' && s[3] == 't' && s[4] == 'i' && s[5] == 'n' && s[6] == 'u' && s[7] == 'e') return TOK_CONTINUE;
+        }
+        case 8: {
+            unsigned h = kw_load4(s);
+            if (h == 0x746e6f63 && s[4]=='i' && s[5]=='n' && s[6]=='u' && s[7]=='e') return TOK_CONTINUE; // "continue"
             break;
+        }
     }
     return TOK_IDENT;
 }

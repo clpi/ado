@@ -1,3 +1,8 @@
 [book]
+title = "Ado Documentation"
 authors = ["Chris Pecunies"]
 language = "en"
+src = "src"
+
+[output.html]
+additional-js = ["theme/ado-highlight.js"]

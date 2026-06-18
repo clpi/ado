@@ -6,7 +6,7 @@ fn main() {
     push(arr, n - i)
     i = i + 1
   }
-  sort(arr)
+  ado_sort(arr)
   let ok = 1
   i = 0
   while i < n - 1 {

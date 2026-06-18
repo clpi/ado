@@ -1,5 +1,5 @@
 # Ado Array Standard Library
-# Higher-order array operations and utilities
+# Utility functions (int-only params/returns)
 
 # Product of all elements
 fn product(arr) {
@@ -7,21 +7,6 @@ fn product(arr) {
   let i = 0
   while i < len(arr) {
     total = total * arr[i]
-    i = i + 1
-  }
-  return total
-}
-
-# Dot product of two arrays
-fn dot_product(a, b) {
-  let n = len(a)
-  if n > len(b) {
-    n = len(b)
-  }
-  let total = 0
-  let i = 0
-  while i < n {
-    total = total + a[i] * b[i]
     i = i + 1
   }
   return total
@@ -55,29 +40,11 @@ fn min_element(arr) {
   return m
 }
 
-# Check if arrays are equal
-fn equal(a, b) {
-  if len(a) != len(b) {
-    return false
-  }
-  let i = 0
-  while i < len(a) {
-    if a[i] != b[i] {
-      return false
-    }
-    i = i + 1
-  }
-  return true
-}
-
-# Median of a sorted array
-fn median(sorted) {
-  if len(sorted) == 0 {
-    return 0
-  }
-  let n = len(sorted)
-  if n % 2 == 0 {
-    return (sorted[n / 2 - 1] + sorted[n / 2]) / 2
-  }
-  return sorted[n / 2]
+# Main entry point for testing
+fn main() {
+  let vals = [1, 2, 3, 4, 5]
+  print("product:", product(vals))
+  print("max:", max_element(vals))
+  print("min:", min_element(vals))
+  return 0
 }

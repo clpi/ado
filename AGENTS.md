@@ -36,11 +36,23 @@ Ado (file extension `.do`) is a minimal, fast programming language that compiles
 ## Benchmark Results (Apple M4)
 
 ```
-fib:    0.93x Ado vs C  (Ado is 7% faster than C)
-prime:  1.44x
-collatz:1.43x
-TOTAL:  1.12x  (was 1.28x before optimizations)
+fib:      0.93x  (Ado 7% faster than C, includes compile+run)
+prime:    1.42x
+collatz:  1.40x
+sort:     1.53x
+array_ops:1.45x
+sumloop:  1.40x
+ackermann:1.49x
+TOTAL:    1.24x
 ```
+
+Ado benchmarks measure full pipeline (lex + parse + codegen + C compile + run) vs pre-compiled C execution only. Ratio < 1.0 means Ado pipeline is faster than C execution alone.
+
+## Known Limitations
+
+- **`defer` statement**: Uses GCC nested functions with `__attribute__((cleanup))`. Not supported on clang/macOS. Use `guard` as an alternative.
+- **Array parameters**: User-defined functions detect array-typed parameters automatically. Runtime functions requiring pointer semantics (`ado_pop`, `ado_remove`, `ado_insert`) must be called with the `ado_` prefix.
+- **macOS compilation**: Generated C code is compiled via `xcrun cc -O1`. The Makefile requires `CC="cc -isysroot $(xcrun --show-sdk-path)"` on macOS.
 
 ## Packaging and CI/CD
 

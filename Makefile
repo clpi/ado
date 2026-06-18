@@ -34,7 +34,7 @@ wasm-test: doc
 	@echo "WASM module ready: examples/stdlib.do.wasm"
 
 bench: doc
-	./benchmarks/run.sh
+	CC="$(CC)" CFLAGS="$(CFLAGS)" ./benchmarks/run.sh
 
 install: doc install-lsp
 	install -d $(DESTDIR)$(BINDIR)

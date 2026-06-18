@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include "lexer.h"
 #include "parser.h"
@@ -56,10 +57,15 @@ int compile_and_run(AST *ast) {
     fclose(out);
 
     char cmd[MAX_CMD_LEN];
-    snprintf(cmd, sizeof(cmd), "cc -O1 -o %s %s 2>/dev/null", bin_path, src_path);
+#ifdef __APPLE__
+    snprintf(cmd, sizeof(cmd), "xcrun cc -O1 -o %s %s -lcurl 2>/dev/null", bin_path, src_path);
+#else
+    snprintf(cmd, sizeof(cmd), "cc -O1 -o %s %s -lcurl 2>/dev/null", bin_path, src_path);
+#endif
     int ret = system(cmd);
+    int compile_failed = !(WIFEXITED(ret) && WEXITSTATUS(ret) == 0);
 
-    if (ret == 0) {
+    if (!compile_failed) {
         snprintf(cmd, sizeof(cmd), "%s", bin_path);
         ret = system(cmd);
     }
@@ -68,7 +74,9 @@ int compile_and_run(AST *ast) {
     remove(bin_path);
     rmdir(temp_dir);
 
-    return ret;
+    if (compile_failed) return 1;
+    if (WIFEXITED(ret)) return WEXITSTATUS(ret);
+    return 1;
 }
 
 void repl(void) {

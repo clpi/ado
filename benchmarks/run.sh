@@ -23,7 +23,7 @@ echo ""
 
 echo "Building C benchmarks..."
 for name in "${BENCHMARKS[@]}"; do
-    cc -O2 -o "$SCRIPT_DIR/$name.c.bin" "$SCRIPT_DIR/$name.c"
+    ${CC:-cc} -O2 -o "$SCRIPT_DIR/$name.c.bin" "$SCRIPT_DIR/$name.c"
 done
 echo "done."
 echo ""
