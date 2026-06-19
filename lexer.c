@@ -86,7 +86,7 @@ static TokenType kw_lookup(const char *s, int len) {
             if (h == 0x6374616d && s[4]=='h') return TOK_MATCH;   // "match"
             if (h == 0x72656877 && s[4]=='e') return TOK_WHERE;   // "where"
             if (h == 0x73696172 && s[4]=='e') return TOK_RAISE;   // "raise"
-            if (h == 0x65627961 && s[4]=='m') return TOK_MAYBE;   // "maybe"
+            if (h == 0x6279616d && s[4]=='m') return TOK_MAYBE;   // "maybe"
             break;
         }
         case 6: {

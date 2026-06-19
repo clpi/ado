@@ -476,6 +476,7 @@ static AST *parse_destructuring_pattern(Parser *p) {
 }
 
 static AST *parse_stmt(Parser *p) {
+    fprintf(stderr, "stmt token %d\n", p->cur.type);
     if (p->cur.type == TOK_TRY) {
         advance(p);
         AST *ast = new_ast(p, AST_TRY);
