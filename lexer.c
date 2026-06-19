@@ -70,6 +70,7 @@ static TokenType kw_lookup(const char *s, int len) {
             if (h == 0x70617773) return TOK_SWAP;  // "swap"
             if (h == 0x70657473) return TOK_STEP;  // "step"
             if (h == 0x6e656877) return TOK_WHEN;  // "when"
+            if (h == 0x65636e6f) return TOK_ONCE;  // "once"
             break;
         }
         case 5: {
@@ -85,6 +86,7 @@ static TokenType kw_lookup(const char *s, int len) {
             if (h == 0x6374616d && s[4]=='h') return TOK_MATCH;   // "match"
             if (h == 0x72656877 && s[4]=='e') return TOK_WHERE;   // "where"
             if (h == 0x73696172 && s[4]=='e') return TOK_RAISE;   // "raise"
+            if (h == 0x65627961 && s[4]=='m') return TOK_MAYBE;   // "maybe"
             break;
         }
         case 6: {

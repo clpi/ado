@@ -576,6 +576,24 @@ static AST *parse_stmt(Parser *p) {
         ast->forever.body = parse_block(p);
         return ast;
     }
+    if (p->cur.type == TOK_ONCE) {
+        advance(p);
+        AST *ast = new_ast(p, AST_ONCE);
+        ast->once_stmt.body = parse_block(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_MAYBE) {
+        advance(p);
+        AST *ast = new_ast(p, AST_MAYBE);
+        ast->maybe_stmt.cond = parse_expr(p);
+        ast->maybe_stmt.body = parse_block(p);
+        ast->maybe_stmt.els = NULL;
+        if (p->cur.type == TOK_ELSE) {
+            advance(p);
+            ast->maybe_stmt.els = parse_block(p);
+        }
+        return ast;
+    }
     if (p->cur.type == TOK_BREAK) {
         advance(p);
         return new_ast(p, AST_BREAK);
@@ -606,12 +624,32 @@ static AST *parse_stmt(Parser *p) {
                 return ast;
             }
         }
-        if (p->cur.type == TOK_ASSIGN) {
+        if (p->cur.type == TOK_ASSIGN || p->cur.type == TOK_PLUSEQ ||
+            p->cur.type == TOK_MINUSEQ || p->cur.type == TOK_STAREQ ||
+            p->cur.type == TOK_SLASHEQ || p->cur.type == TOK_PERCENTEQ) {
+            TokenType op = p->cur.type;
             advance(p);
             AST *ast = new_ast(p, AST_ASSIGN);
             ast->assign.target = new_ast(p, AST_VAR);
             ast->assign.target->var_name = saved_name;
             ast->assign.val = parse_expr(p);
+            if (op != TOK_ASSIGN) {
+                TokenType binop;
+                switch (op) {
+                    case TOK_PLUSEQ: binop = TOK_PLUS; break;
+                    case TOK_MINUSEQ: binop = TOK_MINUS; break;
+                    case TOK_STAREQ: binop = TOK_STAR; break;
+                    case TOK_SLASHEQ: binop = TOK_SLASH; break;
+                    case TOK_PERCENTEQ: binop = TOK_PERCENT; break;
+                    default: binop = TOK_PLUS; break;
+                }
+                AST *rhs = new_ast(p, AST_BINOP);
+                rhs->binop.left = new_ast(p, AST_VAR);
+                rhs->binop.left->var_name = strdup(saved_name);
+                rhs->binop.op = binop;
+                rhs->binop.right = ast->assign.val;
+                ast->assign.val = rhs;
+            }
             return ast;
         }
         if (p->cur.type == TOK_LBRACKET) {
@@ -703,11 +741,27 @@ static AST *parse_stmt(Parser *p) {
         advance(p);
         AST *ast = new_ast(p, AST_FOR);
         ast->for_stmt.var = p->cur.value;
+        ast->for_stmt.step = NULL;
         advance(p);
         if (p->cur.type == TOK_IN) advance(p);
-        ast->for_stmt.start = parse_expr(p);
-        if (p->cur.type == TOK_DOTDOT) advance(p);
-        ast->for_stmt.end = parse_expr(p);
+        ast->for_stmt.start = parse_primary(p);
+        if (p->cur.type == TOK_DOTDOT) {
+            advance(p);
+            ast->for_stmt.end = parse_primary(p);
+            ast->for_stmt.is_array_loop = 0;
+        } else {
+            ast->for_stmt.end = NULL;
+            ast->for_stmt.step = NULL;
+            ast->for_stmt.is_array_loop = 1;
+        }
+        if (ast->for_stmt.is_array_loop) {
+            ast->for_stmt.body = parse_block(p);
+            return ast;
+        }
+        if (p->cur.type == TOK_STEP) {
+            advance(p);
+            ast->for_stmt.step = parse_expr(p);
+        }
         ast->for_stmt.body = parse_block(p);
         return ast;
     }
@@ -864,7 +918,7 @@ static void ast_free_children(AST *ast) {
         case AST_FOR:
             free(ast->for_stmt.var);
             ast_free_children(ast->for_stmt.start);
-            ast_free_children(ast->for_stmt.end);
+            if (!ast->for_stmt.is_array_loop) ast_free_children(ast->for_stmt.end);
             ast_free_children(ast->for_stmt.body);
             break;
         case AST_RETURN:
@@ -982,6 +1036,14 @@ static void ast_free_children(AST *ast) {
         case AST_UNTIL:
             ast_free_children(ast->until_stmt.cond);
             ast_free_children(ast->until_stmt.body);
+            break;
+        case AST_MAYBE:
+            ast_free_children(ast->maybe_stmt.cond);
+            ast_free_children(ast->maybe_stmt.body);
+            ast_free_children(ast->maybe_stmt.els);
+            break;
+        case AST_ONCE:
+            ast_free_children(ast->once_stmt.body);
             break;
         case AST_BREAK:
         case AST_CONTINUE:

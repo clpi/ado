@@ -8,11 +8,11 @@
     },
     {
       "name": "keyword.control.ado",
-      "match": "\\b(fn|let|if|unless|else|for|while|forever|return|in|break|continue|assert|swap)\\b"
+      "match": "\\b(fn|let|if|unless|else|for|while|forever|return|in|break|continue|assert|swap|try|rescue|raise|where|when|defer|guard|until|match|enum)\\b"
     },
     {
       "name": "keyword.operator.ado",
-      "match": "\\.\\.|\\.\\.\\.|==|!=|<=|>=|&&|\\|\\||\\?|\\band\\b|\\bor\\b|\\bnot\\b"
+      "match": "\\.\\.|\\.\\.\\.|==|!=|<=|>=|&&|\\|\\||\\?|=>|\\band\\b|\\bor\\b|\\bnot\\b"
     },
     {
       "name": "keyword.control.conditional.ado",

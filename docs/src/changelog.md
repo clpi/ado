@@ -12,6 +12,7 @@ All notable changes to the Ado language will be documented in this file.
 - **Pattern matching**: `match` expression for algebraic data types.
 - **Enum types**: `enum` for sum types with variants.
 - **Pipe-forward operator**: `value |> fn` for left-to-right function composition.
+- **Rare useful features**: destructuring, list comprehensions, expression blocks, guarded match expressions, match-as-expression, and integer `try`/`rescue` exception handling.
 - **WASM compilation**: Enhanced `--target wasm` support with proper WASI exports.
 
 ## [0.1.0] - Initial Release

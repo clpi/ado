@@ -67,6 +67,32 @@ forever {
 }
 ```
 
+### Destructuring and List Comprehensions
+```
+let [a, b, ...rest] = values
+let squares = [for n in 0..5 n * n]
+let evens = [for n in 0..10 where n % 2 == 0 n]
+```
+
+### Expression Blocks, Match Guards, and Try/Rescue
+```
+let scoped = {
+  let x = 1
+  x + 1
+}
+
+match status {
+  ok when ready => 1,
+  _ => 0
+}
+
+try {
+  raise 42
+} rescue err {
+  print(err)
+}
+```
+
 ## Operators
 
 ### Arithmetic
@@ -175,9 +201,7 @@ fn power(base, exp) {
 ## Limitations
 
 - Only integer and integer array types currently
-- No strings, maps, or structs yet
-- No standard library
-- No module system
+- No strings as full values, maps, structs, modules, or static type checker
 
 ## Getting Help
 

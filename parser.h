@@ -10,7 +10,7 @@ typedef enum {
     AST_UNARY, AST_TYPE, AST_HINT, AST_MATCH, AST_ENUM, AST_PIPE,
     AST_SLICE, AST_LISTCOMP, AST_DESTRUCT, AST_RANGE, AST_SAFE_INDEX,
     AST_SWAP, AST_ASSERT, AST_FOREVER, AST_BREAK, AST_CONTINUE, AST_DEFER,
-    AST_GUARD, AST_UNTIL, AST_MATCH_ARM, AST_TRY, AST_RAISE
+    AST_GUARD, AST_UNTIL, AST_MATCH_ARM, AST_TRY, AST_RAISE, AST_ONCE, AST_MAYBE
 } ASTType;
 
 typedef struct {
@@ -33,7 +33,7 @@ typedef struct AST {
         struct { char *name; struct AST *val; TypeHint *type_hint; } let;
         struct { struct AST *cond, *then, *els; int invert_cond; } if_stmt;
         struct { struct AST *cond, *body; } while_stmt;
-        struct { char *var; struct AST *start, *end, *body; struct AST *step; } for_stmt;
+        struct { char *var; struct AST *start, *end, *body; struct AST *step; int is_array_loop; } for_stmt;
         struct { struct AST *val; } ret;
         struct { struct AST **stmts; int count; } block;
         struct { char *name; char **params; int paramc; TypeHint **param_hints; struct AST *body; TypeHint *return_hint; } fn;
@@ -58,6 +58,8 @@ typedef struct AST {
         struct { struct AST *expr; } defer_stmt;
         struct { struct AST *cond; struct AST *body; } guard_stmt;
         struct { struct AST *cond; struct AST *body; } until_stmt;
+        struct { struct AST *cond; struct AST *body; struct AST *els; } maybe_stmt;
+        struct { struct AST *body; } once_stmt;
         struct { struct AST *body; struct AST *rescue_body; char *rescue_var; } try_stmt;
         struct { struct AST *expr; } raise_stmt;
     };

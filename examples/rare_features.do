@@ -41,6 +41,28 @@ fn main() {
   }
   assert handled == 77
 
+  let once_seen = 0
+  once {
+    once_seen = 1
+  }
+  once {
+    once_seen = once_seen + 1
+  }
+  assert once_seen == 1
+
+  maybe 100 {
+    handled = handled + 1
+  } else {
+    handled = -1
+  }
+  assert handled == 78
+
+  for v in values {
+    assert v >= 1 and v <= 5
+  }
+
+  assert trace(99) == 99
+
   print("rare features ok")
   return 0
 }

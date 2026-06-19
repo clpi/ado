@@ -41,7 +41,7 @@ class AdoLSP:
                          'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push',
                          'hint', 'type', 'break', 'continue',
                          'assert', 'swap', 'match', 'enum', 'defer', 'guard', 'until',
-                         'try', 'rescue', 'raise', 'where', 'when']
+                         'try', 'rescue', 'raise', 'where', 'when', 'once', 'maybe']
         self.builtins = ['print', 'len', 'push', 'abs', 'min', 'max', 'pow', 'clamp', 'sign',
                          'is_even', 'is_odd', 'gcd', 'lcm', 'factorial', 'fib',
                          'sum', 'avg', 'take', 'drop', 'concat', 'fill', 'slice',
@@ -49,7 +49,7 @@ class AdoLSP:
                          'filter', 'find', 'all', 'any',
                          'http_get', 'http_post', 'http_put', 'http_delete', 'http_status',
                          'getenv', 'exit', 'read_file', 'write_file', 'file_exists',
-                         'sleep', 'time', 'random',
+                          'sleep', 'time', 'random', 'trace',
                          'capacity', 'reserve', 'shrink_to_fit',
                          'sort', 'unique', 'reflect']
 
@@ -1080,7 +1080,7 @@ class AdoLSP:
             'label': 'listcomp',
             'kind': 14,
             'detail': 'list comprehension',
-            'insertText': '[for ${1:i} in ${2:start}..${3:end} ${4:expr}]',
+            'insertText': '[for ${1:i} in ${2:start}..${3:end} ${4:where expr }${5:expr}]',
             'insertTextFormat': 2  # Snippet
         })
         
@@ -1161,6 +1161,14 @@ class AdoLSP:
             'kind': 14,
             'detail': 'guard clause with early return',
             'insertText': 'guard ${1:condition} else {\n  ${2:body}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'try_rescue',
+            'kind': 14,
+            'detail': 'integer exception handling',
+            'insertText': 'try {\n  ${1:raise value}\n} rescue ${2:err} {\n  ${3:body}\n}',
             'insertTextFormat': 2
         })
 

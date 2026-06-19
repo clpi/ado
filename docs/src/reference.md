@@ -127,15 +127,16 @@ let y::Int = 2
 
 ### Destructuring
 
-The LSP and Tree-sitter grammar recognize destructuring syntax, but code generation does not yet implement it.
+Destructuring binds array elements to names. `...rest` collects the remaining elements into a new array.
 
 ```ado
-let [a, b, ...rest] = values # Tooling-only today
+let [a, b, ...rest] = values
+[a, b] = values # creates or shadows bindings in the current scope
 ```
 
 ## Expressions
 
-Expressions include literals, identifiers, function calls, array operations, arithmetic, comparisons, logical operators, ranges, slices, safe indexing, and pipe-forward.
+Expressions include literals, identifiers, function calls, array operations, arithmetic, comparisons, logical operators, ranges, slices, safe indexing, pipe-forward, expression blocks, list comprehensions, and match expressions.
 
 ### Function calls
 
@@ -200,6 +201,38 @@ let x = 5 |> double # double(5)
 
 The right side currently expects a function name.
 
+### Expression blocks
+
+A block can be used as an expression. Earlier statements run normally and the final expression result becomes the block value.
+
+```ado
+let scoped = {
+  let local = 40
+  local = local + 2
+} # 42
+```
+
+### List comprehensions
+
+`[for name in start..end where filter body]` builds an integer array. The `where` clause is optional.
+
+```ado
+let squares = [for n in 0..5 n * n]
+let evens = [for n in 0..10 where n % 2 == 0 n]
+```
+
+### Match expressions and guards
+
+`match` can also be used as an expression. Arms use `_` as the default and `when` as a guard.
+
+```ado
+let result = match status {
+  ok when ready => 1,
+  ok => 2,
+  _ => 0
+}
+```
+
 ## Operators
 
 ### Arithmetic
@@ -244,10 +277,12 @@ if 0 < x < 10 {
 | Operator | Meaning |
 |----------|---------|
 | `..` | Range literal or slice delimiter |
-| `...` | Recognized by tooling for spread/rest syntax |
+| `...` | Rest element in destructuring |
 | `=>` | Match arm separator |
 | `|>` | Pipe-forward |
 | `?` | Safe array index |
+| `where` | List comprehension filter |
+| `when` | Match arm guard |
 
 ## Control flow
 
@@ -281,6 +316,20 @@ unless done {
 guard count > 0 else {
   print("empty")
   return 1
+}
+```
+
+### `try` / `rescue`
+
+`try { } rescue err { }` catches integer exceptions raised with `raise value`.
+
+```ado
+let result = 0
+try {
+  raise 42
+  result = 1
+} rescue err {
+  result = err
 }
 ```
 
@@ -332,18 +381,21 @@ for i in 0..5 {
 
 ### `match`
 
-`match` compares an expression against patterns using `==`. `_` is the default arm.
+`match` compares an expression against patterns using `==`. `_` is the default arm. `when` adds a guard condition to an arm.
 
 ```ado
 enum Status { ok, err }
 
 let status = ok
 match status {
+  ok when ready => print("ready"),
   ok => print("ok"),
   err => print("err"),
   _ => print("other")
 }
 ```
+
+Match can be used as a statement or as an expression returning the selected arm expression.
 
 Match arms can contain a statement, a block, or an expression.
 
@@ -595,5 +647,4 @@ WASM support depends on the current `codegen_wasm.c` implementation and external
 - Arrays are dynamic integer arrays, not multi-dimensional or generic containers.
 - Strings are not a complete value type yet.
 - Type hints and compiler hints are parsed but do not affect generated C yet.
-- The LSP and Tree-sitter grammar recognize some future-facing syntax, such as destructuring and list comprehensions, but code generation does not currently implement those features.
 - There is no module system, package manager, floating-point type, struct type, dictionary type, or static type checker yet.
