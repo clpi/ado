@@ -1,11 +1,11 @@
 #!/bin/bash
 # Ado vs C Benchmark Suite
-# Runs equivalent programs in both Ado and C, comparing results and timing.
+# Measures full pipeline (Ado: lex+parse+codegen+C compile+run, C: run only)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOC="$(dirname "$SCRIPT_DIR")/doc"
 
-BENCHMARKS=("fib" "prime" "collatz" "sort" "array_ops" "sumloop" "ackermann")
+BENCHMARKS=("fib" "prime" "collatz" "sort" "array_ops" "sumloop" "ackermann" "bsearch" "matmul")
 ADO_TOTAL=0
 C_TOTAL=0
 PASS=0
@@ -48,10 +48,10 @@ for name in "${BENCHMARKS[@]}"; do
     ado_time=$(python3 -c "print($ado_t2 - $ado_t1)")
     c_time=$(python3 -c "print($c_t2 - $c_t1)")
 
-    ado_result=$(echo "$ado_output" | grep -oE '[0-9]+$' | tail -1)
+    ado_result=$(echo "$ado_output" | grep -oE '[-]?[0-9]+$' | tail -1)
     [ -z "$ado_result" ] && ado_result="$ado_rc"
 
-    c_result=$(echo "$c_output" | grep -oE '[0-9]+$' | tail -1)
+    c_result=$(echo "$c_output" | grep -oE '[-]?[0-9]+$' | tail -1)
     [ -z "$c_result" ] && c_result="$c_rc"
 
     if [ "$ado_result" = "$c_result" ]; then

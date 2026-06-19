@@ -390,10 +390,15 @@ AdoArray ado_flat_map(AdoArray a, int func_idx) {
 AdoArray ado_flatten(AdoArray a) {
     AdoArray r;
     r.len = 0;
-    r.cap = a.len * 4;
+    r.cap = a.len > 0 ? a.len : 4;
     r.data = malloc(r.cap * sizeof(int));
     for (int i = 0; i < a.len; i++) {
         if (a.data[i] < 0) continue;
+        if (r.len >= r.cap) {
+            r.cap = r.cap ? r.cap * 2 : 4;
+            r.data = realloc(r.data, r.cap * sizeof(int));
+        }
+        r.data[r.len++] = a.data[i];
     }
     return r;
 }

@@ -8,8 +8,242 @@ static void gen_stmt(AST *ast, FILE *out, int indent);
 
 static int ado_temp_counter = 0;
 static int ado_defer_counter = 0;
+static int ado_fn_counter = 0;
+static int ado_defer_capacity = 0;
+static int ado_defer_count = 0;
+static int ado_fn_has_defers = 0;
+static AST **ado_defers = NULL;
+static int ado_fn_id = 0;
+static int ado_raise_label = 0;
 static int next_temp(void) { return ado_temp_counter++; }
-static int next_defer(void) { return ado_defer_counter++; }
+static int next_fn_id(void) { return ado_fn_counter++; }
+
+static AST *const_fold(AST *ast) {
+    if (!ast) return NULL;
+    switch (ast->type) {
+        case AST_BINOP:
+            ast->binop.left = const_fold(ast->binop.left);
+            ast->binop.right = const_fold(ast->binop.right);
+            if (ast->binop.left && ast->binop.left->type == AST_INT &&
+                ast->binop.right && ast->binop.right->type == AST_INT) {
+                int l = ast->binop.left->int_val, r = ast->binop.right->int_val, result;
+                switch (ast->binop.op) {
+                    case TOK_PLUS: result = l + r; break;
+                    case TOK_MINUS: result = l - r; break;
+                    case TOK_STAR: result = l * r; break;
+                    case TOK_SLASH: if (r == 0) return ast; result = l / r; break;
+                    case TOK_PERCENT: if (r == 0) return ast; result = l % r; break;
+                    case TOK_EQ: result = l == r; break;
+                    case TOK_NE: result = l != r; break;
+                    case TOK_LT: result = l < r; break;
+                    case TOK_GT: result = l > r; break;
+                    case TOK_LE: result = l <= r; break;
+                    case TOK_GE: result = l >= r; break;
+                    case TOK_AND: result = l && r; break;
+                    case TOK_OR: result = l || r; break;
+                    default: return ast;
+                }
+                ast->type = AST_INT; ast->int_val = result;
+            }
+            return ast;
+        case AST_UNARY:
+            ast->unary.operand = const_fold(ast->unary.operand);
+            if (ast->unary.op == TOK_NOT && ast->unary.operand && ast->unary.operand->type == AST_INT) {
+                ast->type = AST_INT; ast->int_val = !ast->unary.operand->int_val;
+            }
+            return ast;
+        case AST_BLOCK:
+            for (int i = 0; i < ast->block.count; i++)
+                ast->block.stmts[i] = const_fold(ast->block.stmts[i]);
+            return ast;
+        case AST_FN:
+            ast->fn.body = const_fold(ast->fn.body);
+            return ast;
+        case AST_LET:
+            ast->let.val = const_fold(ast->let.val);
+            return ast;
+        case AST_ASSIGN:
+            ast->assign.val = const_fold(ast->assign.val);
+            return ast;
+        case AST_IF:
+            ast->if_stmt.cond = const_fold(ast->if_stmt.cond);
+            ast->if_stmt.then = const_fold(ast->if_stmt.then);
+            if (ast->if_stmt.els) ast->if_stmt.els = const_fold(ast->if_stmt.els);
+            return ast;
+        case AST_WHILE:
+            ast->while_stmt.cond = const_fold(ast->while_stmt.cond);
+            ast->while_stmt.body = const_fold(ast->while_stmt.body);
+            return ast;
+        case AST_FOR:
+            ast->for_stmt.start = const_fold(ast->for_stmt.start);
+            ast->for_stmt.end = const_fold(ast->for_stmt.end);
+            if (ast->for_stmt.step) ast->for_stmt.step = const_fold(ast->for_stmt.step);
+            ast->for_stmt.body = const_fold(ast->for_stmt.body);
+            return ast;
+        case AST_RETURN:
+            ast->ret.val = const_fold(ast->ret.val);
+            return ast;
+        case AST_ARRAY:
+            for (int i = 0; i < ast->array.count; i++)
+                ast->array.elems[i] = const_fold(ast->array.elems[i]);
+            return ast;
+        case AST_LISTCOMP:
+            ast->listcomp.start = const_fold(ast->listcomp.start);
+            ast->listcomp.end = const_fold(ast->listcomp.end);
+            ast->listcomp.body = const_fold(ast->listcomp.body);
+            ast->listcomp.filter = const_fold(ast->listcomp.filter);
+            return ast;
+        case AST_DESTRUCT:
+            ast->destruct.val = const_fold(ast->destruct.val);
+            return ast;
+        case AST_MATCH:
+            ast->match_stmt.expr = const_fold(ast->match_stmt.expr);
+            for (int i = 0; i < ast->match_stmt.arm_count; i++) {
+                ast->match_stmt.arms[i]->match_arm.pattern = const_fold(ast->match_stmt.arms[i]->match_arm.pattern);
+                ast->match_stmt.arms[i]->match_arm.body = const_fold(ast->match_stmt.arms[i]->match_arm.body);
+                ast->match_stmt.arms[i]->match_arm.guard = const_fold(ast->match_stmt.arms[i]->match_arm.guard);
+            }
+            return ast;
+        case AST_TRY:
+            ast->try_stmt.body = const_fold(ast->try_stmt.body);
+            ast->try_stmt.rescue_body = const_fold(ast->try_stmt.rescue_body);
+            return ast;
+        case AST_RAISE:
+            ast->raise_stmt.expr = const_fold(ast->raise_stmt.expr);
+            return ast;
+        case AST_PRINT:
+            for (int i = 0; i < ast->print.count; i++)
+                ast->print.vals[i] = const_fold(ast->print.vals[i]);
+            return ast;
+        case AST_CALL:
+            for (int i = 0; i < ast->call.argc; i++)
+                ast->call.args[i] = const_fold(ast->call.args[i]);
+            return ast;
+        default:
+            return ast;
+    }
+}
+
+static int register_defer(AST *expr) {
+    if (ado_defer_count >= ado_defer_capacity) {
+        ado_defer_capacity = ado_defer_capacity ? ado_defer_capacity * 2 : 8;
+        ado_defers = realloc(ado_defers, ado_defer_capacity * sizeof(AST*));
+    }
+    ado_defers[ado_defer_count++] = expr;
+    return ado_defer_count - 1;
+}
+
+static void reset_defers(void) {
+    ado_defer_count = 0;
+}
+
+static int count_defers_expr(AST *ast);
+static int count_defers_stmt(AST *ast);
+
+static int count_defers_expr(AST *ast) {
+    if (!ast) return 0;
+    switch (ast->type) {
+        case AST_BINOP:
+            return count_defers_expr(ast->binop.left) + count_defers_expr(ast->binop.right);
+        case AST_UNARY:
+            return count_defers_expr(ast->unary.operand);
+        case AST_CALL: {
+            int n = 0;
+            for (int i = 0; i < ast->call.argc; i++) n += count_defers_expr(ast->call.args[i]);
+            return n;
+        }
+        case AST_ARRAY: {
+            int n = 0;
+            for (int i = 0; i < ast->array.count; i++) n += count_defers_expr(ast->array.elems[i]);
+            return n;
+        }
+        case AST_LISTCOMP:
+            return count_defers_expr(ast->listcomp.start) + count_defers_expr(ast->listcomp.end) + count_defers_expr(ast->listcomp.body) + count_defers_expr(ast->listcomp.filter);
+        case AST_DESTRUCT:
+            return count_defers_expr(ast->destruct.val);
+        case AST_MATCH: {
+            int n = count_defers_expr(ast->match_stmt.expr);
+            for (int i = 0; i < ast->match_stmt.arm_count; i++) {
+                n += count_defers_expr(ast->match_stmt.arms[i]->match_arm.pattern);
+                n += count_defers_expr(ast->match_stmt.arms[i]->match_arm.guard);
+                n += count_defers_expr(ast->match_stmt.arms[i]->match_arm.body);
+            }
+            return n;
+        }
+        case AST_BLOCK: {
+            int n = 0;
+            for (int i = 0; i < ast->block.count; i++) n += count_defers_stmt(ast->block.stmts[i]);
+            return n;
+        }
+        case AST_RAISE:
+            return count_defers_expr(ast->raise_stmt.expr);
+        case AST_INDEX:
+            return count_defers_expr(ast->index.arr) + count_defers_expr(ast->index.idx);
+        case AST_SLICE:
+            return count_defers_expr(ast->slice.arr) + count_defers_expr(ast->slice.start) + count_defers_expr(ast->slice.end);
+        case AST_RANGE:
+            return count_defers_expr(ast->range.start) + count_defers_expr(ast->range.end);
+        case AST_LEN:
+            return count_defers_expr(ast->len.arr);
+        case AST_SAFE_INDEX:
+            return count_defers_expr(ast->safe_index.arr) + count_defers_expr(ast->safe_index.idx) + count_defers_expr(ast->safe_index.fallback);
+        default:
+            return 0;
+    }
+}
+
+static int count_defers_stmt(AST *ast) {
+    if (!ast) return 0;
+    int n = (ast->type == AST_DEFER);
+    switch (ast->type) {
+        case AST_LET:
+            return n + count_defers_expr(ast->let.val);
+        case AST_IF:
+            return n + count_defers_expr(ast->if_stmt.cond) + count_defers_stmt(ast->if_stmt.then) + count_defers_stmt(ast->if_stmt.els);
+        case AST_WHILE:
+            return n + count_defers_expr(ast->while_stmt.cond) + count_defers_stmt(ast->while_stmt.body);
+        case AST_FOR:
+            return n + count_defers_expr(ast->for_stmt.start) + count_defers_expr(ast->for_stmt.end) + count_defers_stmt(ast->for_stmt.body);
+        case AST_FOREVER:
+            return n + count_defers_stmt(ast->forever.body);
+        case AST_UNTIL:
+            return n + count_defers_expr(ast->until_stmt.cond) + count_defers_stmt(ast->until_stmt.body);
+        case AST_RETURN:
+            return n + count_defers_expr(ast->ret.val);
+        case AST_BLOCK: {
+            for (int i = 0; i < ast->block.count; i++) n += count_defers_stmt(ast->block.stmts[i]);
+            return n;
+        }
+        case AST_PRINT:
+            for (int i = 0; i < ast->print.count; i++) n += count_defers_expr(ast->print.vals[i]);
+            return n;
+        case AST_PUSH:
+            return n + count_defers_expr(ast->push.arr) + count_defers_expr(ast->push.val);
+        case AST_ASSERT:
+            return n + count_defers_expr(ast->assert_stmt.expr);
+        case AST_SWAP:
+            return n + count_defers_expr(ast->swap.left) + count_defers_expr(ast->swap.right);
+        case AST_ASSIGN:
+            return n + count_defers_expr(ast->assign.target) + count_defers_expr(ast->assign.val);
+        case AST_DESTRUCT:
+            return n + count_defers_expr(ast->destruct.val);
+        case AST_GUARD:
+            return n + count_defers_expr(ast->guard_stmt.cond) + count_defers_stmt(ast->guard_stmt.body);
+        case AST_MATCH: {
+            n += count_defers_expr(ast->match_stmt.expr);
+            for (int i = 0; i < ast->match_stmt.arm_count; i++) n += count_defers_stmt(ast->match_stmt.arms[i]);
+            return n;
+        }
+        case AST_MATCH_ARM:
+            return n + count_defers_expr(ast->match_arm.pattern) + count_defers_expr(ast->match_arm.guard) + count_defers_stmt(ast->match_arm.body);
+        case AST_TRY:
+            return n + count_defers_stmt(ast->try_stmt.body) + count_defers_stmt(ast->try_stmt.rescue_body);
+        case AST_RAISE:
+            return n + count_defers_expr(ast->raise_stmt.expr);
+        default:
+            return n;
+    }
+}
 
 static int expr_uses_array(AST *body, const char *name);
 static int stmt_uses_array(AST *body, const char *name);
@@ -43,6 +277,27 @@ static int expr_uses_array(AST *ast, const char *name) {
             for (int i = 0; i < ast->array.count; i++)
                 if (expr_uses_array(ast->array.elems[i], name)) return 1;
             return 0;
+        case AST_BLOCK:
+            for (int i = 0; i < ast->block.count; i++)
+                if (stmt_uses_array(ast->block.stmts[i], name)) return 1;
+            return 0;
+        case AST_LISTCOMP:
+            return expr_uses_array(ast->listcomp.start, name) ||
+                   expr_uses_array(ast->listcomp.end, name) ||
+                   expr_uses_array(ast->listcomp.body, name) ||
+                   expr_uses_array(ast->listcomp.filter, name);
+        case AST_DESTRUCT:
+            return expr_uses_array(ast->destruct.val, name);
+        case AST_MATCH:
+            if (expr_uses_array(ast->match_stmt.expr, name)) return 1;
+            for (int i = 0; i < ast->match_stmt.arm_count; i++) {
+                if (expr_uses_array(ast->match_stmt.arms[i]->match_arm.pattern, name) ||
+                    expr_uses_array(ast->match_stmt.arms[i]->match_arm.guard, name) ||
+                    expr_uses_array(ast->match_stmt.arms[i]->match_arm.body, name)) return 1;
+            }
+            return 0;
+        case AST_RAISE:
+            return expr_uses_array(ast->raise_stmt.expr, name);
         case AST_RANGE:
             return expr_uses_array(ast->range.start, name) || expr_uses_array(ast->range.end, name);
         default:
@@ -81,6 +336,8 @@ static int stmt_uses_array(AST *ast, const char *name) {
             if (ast->assign.target->type == AST_INDEX && ast->assign.target->index.arr->type == AST_VAR &&
                 strcmp(ast->assign.target->index.arr->var_name, name) == 0) return 1;
             return expr_uses_array(ast->assign.target, name) || expr_uses_array(ast->assign.val, name);
+        case AST_DESTRUCT:
+            return expr_uses_array(ast->destruct.val, name);
         case AST_PUSH:
             if (ast->push.arr->type == AST_VAR && strcmp(ast->push.arr->var_name, name) == 0) return 1;
             return expr_uses_array(ast->push.arr, name) || expr_uses_array(ast->push.val, name);
@@ -90,6 +347,8 @@ static int stmt_uses_array(AST *ast, const char *name) {
             return 0;
         case AST_ASSERT:
             return expr_uses_array(ast->assert_stmt.expr, name);
+        case AST_RAISE:
+            return expr_uses_array(ast->raise_stmt.expr, name);
         case AST_DEFER:
             return expr_uses_array(ast->defer_stmt.expr, name);
         case AST_GUARD:
@@ -100,7 +359,9 @@ static int stmt_uses_array(AST *ast, const char *name) {
                 if (stmt_uses_array(ast->match_stmt.arms[i], name)) return 1;
             return 0;
         case AST_MATCH_ARM:
-            return stmt_uses_array(ast->match_arm.body, name);
+            return expr_uses_array(ast->match_arm.pattern, name) || expr_uses_array(ast->match_arm.guard, name) || stmt_uses_array(ast->match_arm.body, name);
+        case AST_TRY:
+            return stmt_uses_array(ast->try_stmt.body, name) || stmt_uses_array(ast->try_stmt.rescue_body, name);
         case AST_SWAP:
             return expr_uses_array(ast->swap.left, name) || expr_uses_array(ast->swap.right, name);
         default:
@@ -115,18 +376,6 @@ static int param_is_array(AST *body, const char *name) {
 static void gen_indent(FILE *out, int indent);
 static void gen_stmt_as_body(AST *ast, FILE *out, int indent);
 
-static void gen_defer_cleanup(AST *ast, FILE *out, int indent, int id) {
-    gen_indent(out, indent);
-    fprintf(out, "void _ado_defer_%d(void) {\n", id);
-    gen_stmt_as_body(ast, out, indent + 1);
-    gen_indent(out, indent);
-    fprintf(out, "}\n");
-    gen_indent(out, indent);
-    fprintf(out, "void _ado_defer_cleanup_%d(void *unused) { _ado_defer_%d(); }\n", id, id);
-    gen_indent(out, indent);
-    fprintf(out, "char _ado_defer_%d __attribute__((cleanup(_ado_defer_cleanup_%d))) = 0;\n", id, id);
-}
-
 static void gen_stmt_as_body(AST *ast, FILE *out, int indent) {
     if (!ast) return;
     switch (ast->type) {
@@ -135,6 +384,9 @@ static void gen_stmt_as_body(AST *ast, FILE *out, int indent) {
         case AST_PUSH:
         case AST_ASSERT:
         case AST_SWAP:
+        case AST_DESTRUCT:
+        case AST_TRY:
+        case AST_RAISE:
         case AST_IF:
         case AST_WHILE:
         case AST_FOR:
@@ -214,7 +466,12 @@ static void gen_expr(AST *ast, FILE *out) {
             fprintf(out, ")");
             break;
         case AST_UNARY:
-            fprintf(out, "(!");
+            fprintf(out, "(");
+            if (ast->unary.op == TOK_NOT) {
+                fprintf(out, "!");
+            } else if (ast->unary.op == TOK_MINUS) {
+                fprintf(out, "-");
+            }
             gen_expr(ast->unary.operand, out);
             fprintf(out, ")");
             break;
@@ -292,6 +549,87 @@ static void gen_expr(AST *ast, FILE *out) {
             gen_expr(ast->call.args[0], out);
             fprintf(out, ")");
             break;
+        case AST_BLOCK:
+            fprintf(out, "({");
+            for (int i = 0; i < ast->block.count - 1; i++) gen_stmt(ast->block.stmts[i], out, 1);
+            if (ast->block.count > 0) {
+                AST *last = ast->block.stmts[ast->block.count - 1];
+                if (last->type == AST_LET) {
+                    gen_stmt(last, out, 1);
+                    fprintf(out, "%s", last->let.name);
+                } else if (last->type == AST_ASSIGN) {
+                    gen_expr(last->assign.target, out);
+                    fprintf(out, "=");
+                    gen_expr(last->assign.val, out);
+                } else if (last->type == AST_PUSH || last->type == AST_PRINT || last->type == AST_ASSERT ||
+                           last->type == AST_SWAP || last->type == AST_IF || last->type == AST_WHILE ||
+                           last->type == AST_FOR || last->type == AST_UNTIL || last->type == AST_FOREVER ||
+                           last->type == AST_BREAK || last->type == AST_CONTINUE || last->type == AST_RETURN ||
+                           last->type == AST_GUARD || last->type == AST_DEFER || last->type == AST_MATCH ||
+                           last->type == AST_TRY) {
+                    gen_stmt(last, out, 1);
+                    fprintf(out, "0");
+                } else {
+                    gen_expr(last, out);
+                }
+            } else {
+                fprintf(out, "0");
+            }
+            fprintf(out, ";})");
+            break;
+        case AST_LISTCOMP: {
+            int n = next_temp();
+            fprintf(out, "({ int _ado_lc_start_%d=", n);
+            gen_expr(ast->listcomp.start, out);
+            fprintf(out, ", _ado_lc_end_%d=", n);
+            gen_expr(ast->listcomp.end, out);
+            fprintf(out, ", _ado_lc_i_%d; AdoArray _ado_lc_%d=ado_make_array((int[]){},0); for(_ado_lc_i_%d=_ado_lc_start_%d;_ado_lc_i_%d<_ado_lc_end_%d;_ado_lc_i_%d++){__auto_type %s=_ado_lc_i_%d;", n, n, n, n, n, n, n, ast->listcomp.var, n);
+            if (ast->listcomp.filter) {
+                fprintf(out, "if(");
+                gen_expr(ast->listcomp.filter, out);
+                fprintf(out, "){ado_push(&_ado_lc_%d,", n);
+                gen_expr(ast->listcomp.body, out);
+                fprintf(out, ");};}");
+            } else {
+                fprintf(out, "ado_push(&_ado_lc_%d,", n);
+                gen_expr(ast->listcomp.body, out);
+                fprintf(out, ");};");
+            }
+            fprintf(out, "_ado_lc_%d;})", n);
+            break;
+        }
+        case AST_MATCH: {
+            int n = next_temp();
+            fprintf(out, "({__auto_type _ado_match_expr_%d=", n);
+            gen_expr(ast->match_stmt.expr, out);
+            fprintf(out, ";int _ado_match_out_%d=0;", n);
+            int emitted_default = 0;
+            for (int i = 0; i < ast->match_stmt.arm_count; i++) {
+                AST *arm = ast->match_stmt.arms[i];
+                if (arm->match_arm.is_default) {
+                    if (!emitted_default) {
+                        fprintf(out, "{_ado_match_out_%d=", n);
+                        gen_expr(arm->match_arm.body, out);
+                        fprintf(out, ";}");
+                        emitted_default = 1;
+                    }
+                    continue;
+                }
+                fprintf(out, i == 0 ? "if(" : "else if(");
+                gen_expr(arm->match_arm.pattern, out);
+                fprintf(out, "==_ado_match_expr_%d", n);
+                if (arm->match_arm.guard) {
+                    fprintf(out, "&&(");
+                    gen_expr(arm->match_arm.guard, out);
+                    fprintf(out, ")");
+                }
+                fprintf(out, "){_ado_match_out_%d=", n);
+                gen_expr(arm->match_arm.body, out);
+                fprintf(out, ";}");
+            }
+            fprintf(out, "_ado_match_out_%d;})", n);
+            break;
+        }
         default:
             break;
     }
@@ -301,7 +639,8 @@ static void gen_stmt(AST *ast, FILE *out, int indent);
 
 static void gen_block(AST *ast, FILE *out, int indent) {
     for (int i = 0; i < ast->block.count; i++) {
-        gen_stmt(ast->block.stmts[i], out, indent);
+        if (ast->block.stmts[i])
+            gen_stmt(ast->block.stmts[i], out, indent);
     }
 }
 
@@ -349,7 +688,13 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             gen_expr(ast->for_stmt.start, out);
             fprintf(out, ";%s<", ast->for_stmt.var);
             gen_expr(ast->for_stmt.end, out);
-            fprintf(out, ";%s++){\n", ast->for_stmt.var);
+            if (ast->for_stmt.step) {
+                fprintf(out, ";%s+=", ast->for_stmt.var);
+                gen_expr(ast->for_stmt.step, out);
+            } else {
+                fprintf(out, ";%s++", ast->for_stmt.var);
+            }
+            fprintf(out, "){\n");
             gen_block(ast->for_stmt.body, out, indent + 1);
             gen_indent(out, indent);
             fprintf(out, "}\n");
@@ -371,9 +716,19 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             break;
         case AST_RETURN:
             gen_indent(out, indent);
-            fprintf(out, "return ");
-            gen_expr(ast->ret.val, out);
-            fprintf(out, ";\n");
+            if (ado_fn_has_defers) {
+                fprintf(out, "_ado_return_%d=", ado_fn_id);
+                gen_expr(ast->ret.val, out);
+                fprintf(out, ";\n");
+                gen_indent(out, indent);
+                fprintf(out, "_ado_has_return_%d=1;\n", ado_fn_id);
+                gen_indent(out, indent);
+                fprintf(out, "goto _ado_cleanup_%d;\n", ado_fn_id);
+            } else {
+                fprintf(out, "return ");
+                gen_expr(ast->ret.val, out);
+                fprintf(out, ";\n");
+            }
             break;
         case AST_PRINT:
             gen_indent(out, indent);
@@ -408,11 +763,9 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             }
             fprintf(out, ");\n");
             break;
-        case AST_DEFER: {
-            int id = next_defer();
-            gen_defer_cleanup(ast->defer_stmt.expr, out, indent, id);
+        case AST_DEFER:
+            register_defer(ast->defer_stmt.expr);
             break;
-        }
         case AST_GUARD:
             gen_indent(out, indent);
             fprintf(out, "if(!(");
@@ -448,6 +801,66 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
             gen_expr(ast->assert_stmt.expr, out);
             fprintf(out, ")){fprintf(stderr,\"Ado assertion failed\");exit(1);}\n");
             break;
+        case AST_RAISE: {
+            int n = ado_raise_label ? ado_raise_label : next_temp();
+            gen_indent(out, indent);
+            fprintf(out, "_ado_exception_pending=1;_ado_exception_value=");
+            gen_expr(ast->raise_stmt.expr, out);
+            fprintf(out, ";goto _ado_raise_%d;\n", n);
+            break;
+        }
+        case AST_DESTRUCT: {
+            int n = next_temp();
+            gen_indent(out, indent);
+            fprintf(out, "__auto_type _ado_destruct_%d=", n);
+            gen_expr(ast->destruct.val, out);
+            fprintf(out, ";\n");
+            for (int i = 0; i < ast->destruct.count; i++) {
+                gen_indent(out, indent);
+                fprintf(out, "__auto_type %s=", ast->destruct.names[i]);
+                fprintf(out, "_ado_destruct_%d.data[%d];\n", n, i);
+            }
+            if (ast->destruct.has_rest && ast->destruct.rest_name) {
+                int start = ast->destruct.count;
+                gen_indent(out, indent);
+                fprintf(out, "__auto_type %s=ado_make_array((int[]){},_ado_destruct_%d.len>%d?_ado_destruct_%d.len-%d:0);", ast->destruct.rest_name, n, start, n, start);
+                fprintf(out, "\n");
+                gen_indent(out, indent);
+                fprintf(out, "for(int _ado_rest_i_%d=0;_ado_rest_i_%d+_ado_destruct_%d.len>%d&&_ado_rest_i_%d+_ado_destruct_%d.len<_ado_destruct_%d.len;_ado_rest_i_%d++)_ado_destruct_%d.data[_ado_rest_i_%d]=_ado_destruct_%d.data[_ado_rest_i_%d+%d];\n", n, n, n, start, n, n, n, n, n, n, n, n, start);
+            }
+            break;
+        }
+        case AST_TRY: {
+            int n = next_temp();
+            gen_indent(out, indent);
+            fprintf(out, "{\n");
+            gen_indent(out, indent + 1);
+            fprintf(out, "int _ado_try_pending_%d=_ado_exception_pending;int _ado_try_value_%d=_ado_exception_value;_ado_exception_pending=0;\n", n, n);
+            int saved_raise_label = ado_raise_label;
+            ado_raise_label = n;
+            gen_block(ast->try_stmt.body, out, indent + 1);
+            ado_raise_label = saved_raise_label;
+            gen_indent(out, indent + 1);
+            fprintf(out, "_ado_raise_%d:;\n", n);
+            gen_indent(out, indent + 1);
+            fprintf(out, "if(_ado_exception_pending){\n");
+            ado_raise_label = 0;
+            if (ast->try_stmt.rescue_var) {
+                gen_indent(out, indent + 2);
+                fprintf(out, "__auto_type %s=_ado_exception_value;\n", ast->try_stmt.rescue_var);
+            }
+            gen_block(ast->try_stmt.rescue_body, out, indent + 2);
+            ado_raise_label = saved_raise_label;
+            gen_indent(out, indent + 2);
+            fprintf(out, "_ado_exception_pending=0;\n");
+            gen_indent(out, indent + 1);
+            fprintf(out, "}\n");
+            gen_indent(out, indent + 1);
+            fprintf(out, "_ado_exception_pending=_ado_try_pending_%d;_ado_exception_value=_ado_try_value_%d;\n", n, n);
+            gen_indent(out, indent);
+            fprintf(out, "}\n");
+            break;
+        }
         case AST_SWAP: {
             int n = next_temp();
             gen_indent(out, indent);
@@ -498,6 +911,11 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
                 fprintf(out, i == 0 ? "if(" : "else if(");
                 fprintf(out, "_ado_match_%d==", n);
                 gen_expr(arm->match_arm.pattern, out);
+                if (arm->match_arm.guard) {
+                    fprintf(out, "&&(");
+                    gen_expr(arm->match_arm.guard, out);
+                    fprintf(out, ")");
+                }
                 fprintf(out, "){\n");
                 gen_stmt_as_body(arm->match_arm.body, out, indent + 1);
                 gen_indent(out, indent);
@@ -516,11 +934,15 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
 }
 
 void codegen(AST *ast, FILE *out) {
+    const_fold(ast);
     fprintf(out, "#include <stdio.h>\n");
     fprintf(out, "#include <stdlib.h>\n");
     fprintf(out, "#include <string.h>\n");
     // Runtime library (inline)
     fprintf(out, "typedef struct { int *data; int len; int cap; } AdoArray;\n");
+    fprintf(out, "static int _ado_exception_pending=0;\n");
+    fprintf(out, "static int _ado_exception_value=0;\n");
+    fprintf(out, "static int ado_raise(int v){_ado_exception_pending=1;_ado_exception_value=v;return 0;}\n");
     fprintf(out, "static AdoArray ado_make_array(int *init, int c) {\n");
     fprintf(out, "  AdoArray a; a.len=c; a.cap=c>0?c:4; a.data=malloc(a.cap*sizeof(int));\n");
     fprintf(out, "  for(int i=0;i<c;i++) a.data[i]=init[i]; return a;\n");
@@ -601,6 +1023,11 @@ void codegen(AST *ast, FILE *out) {
         AST *node = ast->block.stmts[i];
         if (node->type == AST_FN) {
             if (strcmp(node->fn.name, "main") == 0) has_main = 1;
+            reset_defers();
+            int fn_id = next_fn_id();
+            ado_fn_id = fn_id;
+            int has_defers = count_defers_stmt(node->fn.body) > 0;
+            ado_fn_has_defers = has_defers;
             fprintf(out, "int %s(", node->fn.name);
             for (int j = 0; j < node->fn.paramc; j++) {
                 int is_array = param_is_array(node->fn.body, node->fn.params[j]);
@@ -608,8 +1035,20 @@ void codegen(AST *ast, FILE *out) {
                 if (j < node->fn.paramc - 1) fprintf(out, ",");
             }
             fprintf(out, "){\n");
+            if (has_defers) {
+                fprintf(out, "  int _ado_has_return_%d=0;\n", fn_id);
+                fprintf(out, "  int _ado_return_%d=0;\n", fn_id);
+            }
             gen_block(node->fn.body, out, 1);
-            if (strcmp(node->fn.name, "main") != 0) {
+            if (has_defers) {
+                fprintf(out, "  goto _ado_cleanup_%d;\n", fn_id);
+                fprintf(out, "_ado_cleanup_%d:\n", fn_id);
+                for (int d = ado_defer_count - 1; d >= 0; d--) {
+                    gen_stmt_as_body(ado_defers[d], out, 1);
+                }
+                fprintf(out, "  if(_ado_has_return_%d)return _ado_return_%d;\n", fn_id, fn_id);
+                fprintf(out, "  return 0;\n");
+            } else if (strcmp(node->fn.name, "main") != 0) {
                 fprintf(out, "  return 0;\n");
             }
             fprintf(out, "}\n\n");

@@ -57,6 +57,7 @@ static TokenType kw_lookup(const char *s, int len) {
             if (h == 0x746f6e) return TOK_NOT;   // "not"
             if (h == 0x646e61) return TOK_AND;   // "and"
             if (h == 0x6e656c) return TOK_LEN;   // "len"
+            if (h == 0x797274) return TOK_TRY;   // "try"
             break;
         }
         case 4: {
@@ -67,6 +68,8 @@ static TokenType kw_lookup(const char *s, int len) {
             if (h == 0x746e6968) return TOK_HINT;  // "hint"
             if (h == 0x6d756e65) return TOK_ENUM;  // "enum"
             if (h == 0x70617773) return TOK_SWAP;  // "swap"
+            if (h == 0x70657473) return TOK_STEP;  // "step"
+            if (h == 0x6e656877) return TOK_WHEN;  // "when"
             break;
         }
         case 5: {
@@ -80,6 +83,8 @@ static TokenType kw_lookup(const char *s, int len) {
             if (h == 0x72617567 && s[4]=='d') return TOK_GUARD;   // "guard"
             if (h == 0x69746e75 && s[4]=='l') return TOK_UNTIL;   // "until"
             if (h == 0x6374616d && s[4]=='h') return TOK_MATCH;   // "match"
+            if (h == 0x72656877 && s[4]=='e') return TOK_WHERE;   // "where"
+            if (h == 0x73696172 && s[4]=='e') return TOK_RAISE;   // "raise"
             break;
         }
         case 6: {
@@ -87,6 +92,7 @@ static TokenType kw_lookup(const char *s, int len) {
             if (h == 0x75746572 && s[4]=='r' && s[5]=='n') return TOK_RETURN;  // "return"
             if (h == 0x65737361 && s[4]=='r' && s[5]=='t') return TOK_ASSERT;  // "assert"
             if (h == 0x656c6e75 && s[4]=='s' && s[5]=='s') return TOK_UNLESS;  // "unless"
+            if (h == 0x63736572 && s[4]=='u' && s[5]=='e') return TOK_RESCUE;  // "rescue"
             break;
         }
         case 7: {
@@ -136,11 +142,13 @@ Token lexer_next(Lexer *lex) {
         return tok;
     }
     
-    if (c == '"') {
+    if (c == '"' || c == '`') {
+        char delim = c;
         lex->pos++;
         int start = lex->pos;
-        while (lex->src[lex->pos] != '"' && lex->src[lex->pos] != '\0') {
-            if (lex->src[lex->pos] == '\\') lex->pos++;
+        while (lex->src[lex->pos] != delim && lex->src[lex->pos] != '\0') {
+            if (delim == '"' && lex->src[lex->pos] == '\\') lex->pos++;
+            if (lex->src[lex->pos] == '\n') lex->line++;
             lex->pos++;
         }
         int len = lex->pos - start;
@@ -186,15 +194,28 @@ Token lexer_next(Lexer *lex) {
             tok.type = TOK_PIPE;
             break;
         case '?': tok.type = TOK_QMARK; break;
-        case '+': tok.type = TOK_PLUS; break;
+        case '+':
+            if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_PLUSEQ; }
+            else tok.type = TOK_PLUS;
+            break;
         case '-':
             if (lex->src[lex->pos] == '>') { lex->pos++; tok.type = TOK_ARROW; }
+            else if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_MINUSEQ; }
             else tok.type = TOK_MINUS;
             break;
         case '~': tok.type = TOK_TILDE; break;
-        case '*': tok.type = TOK_STAR; break;
-        case '/': tok.type = TOK_SLASH; break;
-        case '%': tok.type = TOK_PERCENT; break;
+        case '*':
+            if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_STAREQ; }
+            else tok.type = TOK_STAR;
+            break;
+        case '/':
+            if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_SLASHEQ; }
+            else tok.type = TOK_SLASH;
+            break;
+        case '%':
+            if (lex->src[lex->pos] == '=') { lex->pos++; tok.type = TOK_PERCENTEQ; }
+            else tok.type = TOK_PERCENT;
+            break;
         case '.':
             if (lex->src[lex->pos] == '.') {
                 lex->pos++;

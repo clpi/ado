@@ -10,7 +10,7 @@ typedef enum {
     AST_UNARY, AST_TYPE, AST_HINT, AST_MATCH, AST_ENUM, AST_PIPE,
     AST_SLICE, AST_LISTCOMP, AST_DESTRUCT, AST_RANGE, AST_SAFE_INDEX,
     AST_SWAP, AST_ASSERT, AST_FOREVER, AST_BREAK, AST_CONTINUE, AST_DEFER,
-    AST_GUARD, AST_UNTIL, AST_MATCH_ARM
+    AST_GUARD, AST_UNTIL, AST_MATCH_ARM, AST_TRY, AST_RAISE
 } ASTType;
 
 typedef struct {
@@ -33,7 +33,7 @@ typedef struct AST {
         struct { char *name; struct AST *val; TypeHint *type_hint; } let;
         struct { struct AST *cond, *then, *els; int invert_cond; } if_stmt;
         struct { struct AST *cond, *body; } while_stmt;
-        struct { char *var; struct AST *start, *end, *body; } for_stmt;
+        struct { char *var; struct AST *start, *end, *body; struct AST *step; } for_stmt;
         struct { struct AST *val; } ret;
         struct { struct AST **stmts; int count; } block;
         struct { char *name; char **params; int paramc; TypeHint **param_hints; struct AST *body; TypeHint *return_hint; } fn;
@@ -47,10 +47,10 @@ typedef struct AST {
         struct { char *name; struct AST *args; } hint_stmt;
         struct { char *enum_name; struct AST **variants; int variant_count; } enum_def;
         struct { struct AST *expr; struct AST **arms; int arm_count; } match_stmt;
-        struct { struct AST *pattern; struct AST *body; int is_default; } match_arm;
+        struct { struct AST *pattern; struct AST *body; struct AST *guard; int is_default; } match_arm;
         struct { struct AST *arr; struct AST *start; struct AST *end; } slice;
         struct { char *var; struct AST *start; struct AST *end; struct AST *body; struct AST *filter; } listcomp;
-        struct { char **names; int count; int has_rest; char *rest_name; struct AST *val; } destruct;
+        struct { char **names; int count; int has_rest; char *rest_name; struct AST *val; int is_let; } destruct;
         struct { struct AST *arr; struct AST *idx; struct AST *fallback; } safe_index;
         struct { struct AST *left, *right; } swap;
         struct { struct AST *expr; } assert_stmt;
@@ -58,6 +58,8 @@ typedef struct AST {
         struct { struct AST *expr; } defer_stmt;
         struct { struct AST *cond; struct AST *body; } guard_stmt;
         struct { struct AST *cond; struct AST *body; } until_stmt;
+        struct { struct AST *body; struct AST *rescue_body; char *rescue_var; } try_stmt;
+        struct { struct AST *expr; } raise_stmt;
     };
 } AST;
 

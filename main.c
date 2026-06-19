@@ -110,9 +110,10 @@ void repl(void) {
             printf("  Match: match expr { pattern => result }\n");
             printf("  Control: if condition { } else { }, unless condition { } else { }, while condition { }, forever { }\n");
             printf("  Loop controls: break, continue\n");
-            printf("  Safety: assert expr, arr?idx, arr?idx:fallback\n");
-            printf("  Swap: swap a, b\n");
-            printf("  I/O: print(expr1, expr2, ...)\n");
+            printf("  Safety: assert expr, arr?idx, arr?idx:fallback, try { } rescue err { }\n");
+            printf("  Destructuring: let [a, b, ...rest] = arr; [a, b] = arr\n");
+            printf("  Expressions: expression blocks { ... }, match as expression, list comprehensions [for x in a..b expr]\n");
+            printf("  Swap and I/O: swap a, b; print(expr1, expr2, ...)\n");
             printf("  Operators: + - * / %% == != < > <= >= and or or not\n");
             printf("  Arrays: [1, 2, 3], arr[index]\n");
             printf("  Strings: \"hello\\nworld\"\n");

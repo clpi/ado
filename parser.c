@@ -6,6 +6,9 @@
 static void advance(Parser *p) { p->cur = lexer_next(p->lex); }
 static AST *parse_expr(Parser *p);
 static AST *parse_stmt(Parser *p);
+static AST *parse_block(Parser *p);
+static AST *parse_match_stmt(Parser *p, int expr_body);
+static AST *parse_destructuring_pattern(Parser *p);
 static TypeHint *parse_optional_type(Parser *p) {
     if (p->cur.type == TOK_COLON || p->cur.type == TOK_COLONCOLON) {
         int is_required = (p->cur.type == TOK_COLONCOLON);
@@ -109,6 +112,23 @@ static AST *parse_primary(Parser *p) {
     }
     if (p->cur.type == TOK_LBRACKET) {
         advance(p);
+        if (p->cur.type == TOK_FOR) {
+            AST *ast = new_ast(p, AST_LISTCOMP);
+            advance(p);
+            ast->listcomp.var = p->cur.value;
+            advance(p);
+            if (p->cur.type == TOK_IN) advance(p);
+            ast->listcomp.start = parse_primary(p);
+            if (p->cur.type == TOK_DOTDOT) advance(p);
+            ast->listcomp.end = parse_primary(p);
+            if (p->cur.type == TOK_WHERE) {
+                advance(p);
+                ast->listcomp.filter = parse_expr(p);
+            }
+            ast->listcomp.body = parse_expr(p);
+            if (p->cur.type == TOK_RBRACKET) advance(p);
+            return ast;
+        }
         AST *ast = new_ast(p, AST_ARRAY);
         int cap = 4;
         ast->array.elems = malloc(cap * sizeof(AST*));
@@ -225,10 +245,23 @@ static AST *parse_primary(Parser *p) {
         advance(p);
         return ast;
     }
+    if (p->cur.type == TOK_LBRACE) {
+        return parse_block(p);
+    }
+    if (p->cur.type == TOK_MATCH) {
+        return parse_match_stmt(p, 1);
+    }
     if (p->cur.type == TOK_NOT) {
         advance(p);
         AST *ast = new_ast(p, AST_UNARY);
         ast->unary.op = TOK_NOT;
+        ast->unary.operand = parse_primary(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_MINUS) {
+        advance(p);
+        AST *ast = new_ast(p, AST_UNARY);
+        ast->unary.op = TOK_MINUS;
         ast->unary.operand = parse_primary(p);
         return ast;
     }
@@ -366,14 +399,21 @@ static AST *parse_block(Parser *p) {
     return ast;
 }
 
-static AST *parse_match_arm(Parser *p) {
+static AST *parse_match_arm(Parser *p, int expr_body) {
     AST *ast = new_ast(p, AST_MATCH_ARM);
     ast->match_arm.pattern = parse_expr(p);
+    ast->match_arm.guard = NULL;
     if (ast->match_arm.pattern && ast->match_arm.pattern->type == AST_VAR && strcmp(ast->match_arm.pattern->var_name, "_") == 0) {
         ast->match_arm.is_default = 1;
     }
+    if (p->cur.type == TOK_WHEN) {
+        advance(p);
+        ast->match_arm.guard = parse_expr(p);
+    }
     if (p->cur.type == TOK_FATARROW) advance(p);
-    if (p->cur.type == TOK_PRINT) {
+    if (expr_body) {
+        ast->match_arm.body = parse_expr(p);
+    } else if (p->cur.type == TOK_PRINT) {
         ast->match_arm.body = parse_stmt(p);
     } else if (p->cur.type == TOK_LBRACE) {
         ast->match_arm.body = parse_block(p);
@@ -384,7 +424,87 @@ static AST *parse_match_arm(Parser *p) {
     return ast;
 }
 
+static AST *parse_match_stmt(Parser *p, int expr_body) {
+    advance(p);
+    AST *ast = new_ast(p, AST_MATCH);
+    ast->match_stmt.expr = parse_expr(p);
+    if (p->cur.type == TOK_LBRACE) advance(p);
+    int cap = 4;
+    ast->match_stmt.arms = malloc(cap * sizeof(AST*));
+    ast->match_stmt.arm_count = 0;
+    while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
+        if (ast->match_stmt.arm_count >= cap) {
+            cap *= 2;
+            ast->match_stmt.arms = realloc(ast->match_stmt.arms, cap * sizeof(AST*));
+        }
+        ast->match_stmt.arms[ast->match_stmt.arm_count++] = parse_match_arm(p, expr_body);
+    }
+    if (p->cur.type == TOK_RBRACE) advance(p);
+    return ast;
+}
+
+static AST *parse_destructuring_pattern(Parser *p) {
+    AST *ast = new_ast(p, AST_DESTRUCT);
+    int cap = 4;
+    ast->destruct.names = malloc(cap * sizeof(char*));
+    ast->destruct.count = 0;
+    ast->destruct.has_rest = 0;
+    ast->destruct.rest_name = NULL;
+    ast->destruct.val = NULL;
+    ast->destruct.is_let = 0;
+    advance(p);
+    while (p->cur.type != TOK_RBRACKET && p->cur.type != TOK_EOF) {
+        if (p->cur.type == TOK_DOTDOTDOT) {
+            advance(p);
+            ast->destruct.has_rest = 1;
+            if (p->cur.type == TOK_IDENT) {
+                ast->destruct.rest_name = p->cur.value;
+                advance(p);
+            }
+        } else if (p->cur.type == TOK_IDENT) {
+            if (ast->destruct.count >= cap) {
+                cap *= 2;
+                ast->destruct.names = realloc(ast->destruct.names, cap * sizeof(char*));
+            }
+            ast->destruct.names[ast->destruct.count++] = p->cur.value;
+            advance(p);
+        }
+        if (p->cur.type == TOK_COMMA) advance(p);
+    }
+    if (p->cur.type == TOK_RBRACKET) advance(p);
+    return ast;
+}
+
 static AST *parse_stmt(Parser *p) {
+    if (p->cur.type == TOK_TRY) {
+        advance(p);
+        AST *ast = new_ast(p, AST_TRY);
+        ast->try_stmt.rescue_var = NULL;
+        ast->try_stmt.body = parse_block(p);
+        if (p->cur.type == TOK_RESCUE) {
+            advance(p);
+            if (p->cur.type == TOK_IDENT) {
+                ast->try_stmt.rescue_var = p->cur.value;
+                advance(p);
+            }
+            ast->try_stmt.rescue_body = parse_block(p);
+        }
+        return ast;
+    }
+    if (p->cur.type == TOK_RAISE) {
+        advance(p);
+        AST *ast = new_ast(p, AST_RAISE);
+        ast->raise_stmt.expr = parse_expr(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_LBRACKET) {
+        AST *ast = parse_destructuring_pattern(p);
+        if (p->cur.type == TOK_ASSIGN) {
+            advance(p);
+            ast->destruct.val = parse_expr(p);
+        }
+        return ast;
+    }
     if (p->cur.type == TOK_AT) {
         advance(p);
         AST *ast = new_ast(p, AST_HINT);
@@ -542,6 +662,13 @@ static AST *parse_stmt(Parser *p) {
     }
     if (p->cur.type == TOK_LET) {
         advance(p);
+        if (p->cur.type == TOK_LBRACKET) {
+            AST *ast = parse_destructuring_pattern(p);
+            ast->destruct.is_let = 1;
+            if (p->cur.type == TOK_ASSIGN) advance(p);
+            ast->destruct.val = parse_expr(p);
+            return ast;
+        }
         AST *ast = new_ast(p, AST_LET);
         ast->let.name = p->cur.value;
         advance(p);
@@ -632,22 +759,7 @@ static AST *parse_stmt(Parser *p) {
         return parse_block(p);
     }
     if (p->cur.type == TOK_MATCH) {
-        advance(p);
-        AST *ast = new_ast(p, AST_MATCH);
-        ast->match_stmt.expr = parse_expr(p);
-        if (p->cur.type == TOK_LBRACE) advance(p);
-        int cap = 4;
-        ast->match_stmt.arms = malloc(cap * sizeof(AST*));
-        ast->match_stmt.arm_count = 0;
-        while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
-            if (ast->match_stmt.arm_count >= cap) {
-                cap *= 2;
-                ast->match_stmt.arms = realloc(ast->match_stmt.arms, cap * sizeof(AST*));
-            }
-            ast->match_stmt.arms[ast->match_stmt.arm_count++] = parse_match_arm(p);
-        }
-        if (p->cur.type == TOK_RBRACE) advance(p);
-        return ast;
+        return parse_match_stmt(p, 0);
     }
     if (p->cur.type == TOK_ENUM) {
         advance(p);
@@ -813,6 +925,7 @@ static void ast_free_children(AST *ast) {
         case AST_MATCH_ARM:
             ast_free_children(ast->match_arm.pattern);
             ast_free_children(ast->match_arm.body);
+            ast_free_children(ast->match_arm.guard);
             break;
         case AST_ENUM:
             free(ast->enum_def.enum_name);
@@ -822,6 +935,19 @@ static void ast_free_children(AST *ast) {
         case AST_RANGE:
             ast_free_children(ast->range.start);
             ast_free_children(ast->range.end);
+            break;
+        case AST_LISTCOMP:
+            free(ast->listcomp.var);
+            ast_free_children(ast->listcomp.start);
+            ast_free_children(ast->listcomp.end);
+            ast_free_children(ast->listcomp.body);
+            ast_free_children(ast->listcomp.filter);
+            break;
+        case AST_DESTRUCT:
+            for (int i = 0; i < ast->destruct.count; i++) free(ast->destruct.names[i]);
+            free(ast->destruct.names);
+            free(ast->destruct.rest_name);
+            ast_free_children(ast->destruct.val);
             break;
         case AST_SAFE_INDEX:
             ast_free_children(ast->safe_index.arr);
@@ -837,6 +963,14 @@ static void ast_free_children(AST *ast) {
             break;
         case AST_FOREVER:
             ast_free_children(ast->forever.body);
+            break;
+        case AST_TRY:
+            ast_free_children(ast->try_stmt.body);
+            ast_free_children(ast->try_stmt.rescue_body);
+            free(ast->try_stmt.rescue_var);
+            break;
+        case AST_RAISE:
+            ast_free_children(ast->raise_stmt.expr);
             break;
         case AST_DEFER:
             ast_free_children(ast->defer_stmt.expr);

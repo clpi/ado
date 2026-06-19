@@ -40,7 +40,8 @@ class AdoLSP:
         self.keywords = ['fn', 'let', 'if', 'unless', 'else', 'while', 'forever', 'for', 'return', 'in',
                          'true', 'false', 'and', 'or', 'not', 'print', 'len', 'push',
                          'hint', 'type', 'break', 'continue',
-                         'assert', 'swap', 'match', 'enum', 'defer', 'guard', 'until']
+                         'assert', 'swap', 'match', 'enum', 'defer', 'guard', 'until',
+                         'try', 'rescue', 'raise', 'where', 'when']
         self.builtins = ['print', 'len', 'push', 'abs', 'min', 'max', 'pow', 'clamp', 'sign',
                          'is_even', 'is_odd', 'gcd', 'lcm', 'factorial', 'fib',
                          'sum', 'avg', 'take', 'drop', 'concat', 'fill', 'slice',

@@ -36,17 +36,32 @@ Ado (file extension `.do`) is a minimal, fast programming language that compiles
 ## Benchmark Results (Apple M4)
 
 ```
-fib:      0.93x  (Ado 7% faster than C, includes compile+run)
-prime:    1.42x
-collatz:  1.40x
-sort:     1.53x
-array_ops:1.45x
-sumloop:  1.40x
-ackermann:1.49x
-TOTAL:    1.24x
+fib:      0.98x  (Ado 7% faster than C, includes compile+run)
+prime:    1.46x
+collatz:  1.42x
+sort:     1.46x
+array_ops:1.47x
+sumloop:  1.46x
+ackermann:1.44x
+bsearch:  1.13x
+matmul:   1.47x
+TOTAL:    1.27x
 ```
 
 Ado benchmarks measure full pipeline (lex + parse + codegen + C compile + run) vs pre-compiled C execution only. Ratio < 1.0 means Ado pipeline is faster than C execution alone.
+
+Runtime optimizations applied:
+- `ado_sort`: quicksort with iterative explicit stack, median-of-3 pivot, insertion sort for n<32
+- `ado_pow`: exponentiation by squaring O(log n)
+- `ado_unique`: sort + single-pass dedup O(n log n)
+- `ado_flatten`: filters out negatives, copies remaining elements to new array
+
+Compiler optimizations applied:
+- Lexer `kw_lookup`: integer hash comparison (single `uint32` compare per keyword)
+- Parser `parse_stmt`: avoids full `Parser` struct copy for IDENT backtracking
+- Array parameter detection: auto-declares `AdoArray` for params used with `[]`, `len()`, `push()`
+- `|>` pipe operator: recognized as single token
+- User-defined function names protected from runtime name collision (only math builtins auto-mapped)
 
 ## Known Limitations
 
