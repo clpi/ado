@@ -75,9 +75,9 @@ Produces diagnostics for the missing assignment and undefined `foo`.
 
 Completions include:
 
-- Keywords such as `fn`, `let`, `if`, `unless`, `while`, `forever`, `for`, `return`, `break`, `continue`, `assert`, `swap`, `match`, `enum`, `defer`, `guard`, and `until`.
-- Built-ins such as `print`, `len`, `push`, `abs`, `min`, `max`, `pow`, `clamp`, `gcd`, `lcm`, `factorial`, `fib`, `sum`, `avg`, `sort`, `unique`, `reflect`, `http_get`, `getenv`, `read_file`, `sleep`, `time`, and `random`.
-- Snippets for `slice`, `listcomp`, destructuring, safe indexing, `swap`, `unless`, `forever`, `assert`, `match`, `enum`, `defer`, `guard`, and `until`.
+- Keywords such as `fn`, `let`, `if`, `unless`, `while`, `forever`, `for`, `return`, `break`, `continue`, `assert`, `swap`, `match`, `enum`, `defer`, `guard`, `until`, `try`, `rescue`, `raise`, `once`, and `maybe`.
+- Built-ins such as `print`, `trace`, `len`, `push`, `abs`, `min`, `max`, `pow`, `clamp`, `gcd`, `lcm`, `factorial`, `fib`, `sum`, `avg`, `sort`, `unique`, `reflect`, `http_get`, `getenv`, `read_file`, `sleep`, `time`, and `random`.
+- Snippets for `slice`, `listcomp`, destructuring, safe indexing, `swap`, `unless`, `forever`, `assert`, `match`, `enum`, `defer`, `guard`, `until`, `once`, and `maybe`.
 - Parsed functions, variables, parameters, enums, and enum members from open documents.
 
 ## Hover documentation

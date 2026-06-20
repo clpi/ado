@@ -497,6 +497,85 @@ static AST *parse_stmt(Parser *p) {
         ast->raise_stmt.expr = parse_expr(p);
         return ast;
     }
+    if (p->cur.type == TOK_INVARIANT) {
+        advance(p);
+        AST *ast = new_ast(p, AST_INVARIANT);
+        ast->invariant.check_index = 0;
+        if (p->cur.type == TOK_IDENT) {
+            ast->invariant.var_name = p->cur.value;
+            advance(p);
+        }
+        if (p->cur.type == TOK_LBRACE) advance(p);
+        ast->invariant.body = parse_expr(p);
+        if (p->cur.type == TOK_RBRACE) advance(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_TILDE) {
+        advance(p);
+        AST *ast = NULL;
+        if (p->cur.type == TOK_BEFORE) {
+            advance(p);
+            ast = new_ast(p, AST_AROUND);
+            ast->aspect.is_before = 1;
+            if (p->cur.type == TOK_IDENT) {
+                ast->aspect.fn_name = p->cur.value;
+                advance(p);
+            }
+        } else if (p->cur.type == TOK_AFTER) {
+            advance(p);
+            ast = new_ast(p, AST_AROUND);
+            ast->aspect.is_after = 1;
+            if (p->cur.type == TOK_IDENT) {
+                ast->aspect.fn_name = p->cur.value;
+                advance(p);
+            }
+        } else if (p->cur.type == TOK_IDENT) {
+            ast = new_ast(p, AST_AROUND);
+            ast->aspect.is_around = 1;
+            ast->aspect.fn_name = p->cur.value;
+            advance(p);
+        }
+        if (ast && p->cur.type == TOK_LBRACE) advance(p);
+        if (ast) ast->aspect.body = parse_block(p);
+        if (ast && p->cur.type == TOK_RBRACE) advance(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_CHECK) {
+        advance(p);
+        AST *ast = new_ast(p, AST_CHECK);
+        ast->check.expr = parse_expr(p);
+        return ast;
+    }
+    if (p->cur.type == TOK_TILDE) {
+        advance(p);
+        AST *ast = NULL;
+        if (p->cur.type == TOK_BEFORE) {
+            advance(p);
+            ast = new_ast(p, AST_AROUND);
+            ast->aspect.is_before = 1;
+            if (p->cur.type == TOK_IDENT) {
+                ast->aspect.fn_name = p->cur.value;
+                advance(p);
+            }
+        } else if (p->cur.type == TOK_AFTER) {
+            advance(p);
+            ast = new_ast(p, AST_AROUND);
+            ast->aspect.is_after = 1;
+            if (p->cur.type == TOK_IDENT) {
+                ast->aspect.fn_name = p->cur.value;
+                advance(p);
+            }
+        } else if (p->cur.type == TOK_IDENT) {
+            ast = new_ast(p, AST_AROUND);
+            ast->aspect.is_around = 1;
+            ast->aspect.fn_name = p->cur.value;
+            advance(p);
+        }
+        if (ast && p->cur.type == TOK_LBRACE) advance(p);
+        if (ast) ast->aspect.body = parse_block(p);
+        if (ast && p->cur.type == TOK_RBRACE) advance(p);
+        return ast;
+    }
     if (p->cur.type == TOK_LBRACKET) {
         AST *ast = parse_destructuring_pattern(p);
         if (p->cur.type == TOK_ASSIGN) {
@@ -506,44 +585,44 @@ static AST *parse_stmt(Parser *p) {
         return ast;
     }
     if (p->cur.type == TOK_AT) {
-        advance(p);
-        AST *ast = new_ast(p, AST_HINT);
-        if (p->cur.type == TOK_IDENT) {
-            ast->hint_stmt.name = p->cur.value;
             advance(p);
+            AST *ast = new_ast(p, AST_HINT);
+            if (p->cur.type == TOK_IDENT) {
+                ast->hint_stmt.name = p->cur.value;
+                advance(p);
+            }
+            return ast;
         }
-        return ast;
-    }
-    if (p->cur.type == TOK_UNLESS) {
-        advance(p);
-        AST *ast = new_ast(p, AST_IF);
-        ast->if_stmt.cond = parse_expr(p);
-        ast->if_stmt.then = parse_block(p);
-        ast->if_stmt.els = NULL;
-        ast->if_stmt.invert_cond = 1;
-        if (p->cur.type == TOK_ELSE) {
+        if (p->cur.type == TOK_UNLESS) {
             advance(p);
-            ast->if_stmt.els = parse_block(p);
+            AST *ast = new_ast(p, AST_IF);
+            ast->if_stmt.cond = parse_expr(p);
+            ast->if_stmt.then = parse_block(p);
+            ast->if_stmt.els = NULL;
+            ast->if_stmt.invert_cond = 1;
+            if (p->cur.type == TOK_ELSE) {
+                advance(p);
+                ast->if_stmt.els = parse_block(p);
+            }
+            return ast;
         }
-        return ast;
-    }
-    if (p->cur.type == TOK_ASSERT) {
-        advance(p);
-        AST *ast = new_ast(p, AST_ASSERT);
-        ast->assert_stmt.expr = parse_expr(p);
-        return ast;
-    }
-    if (p->cur.type == TOK_DEFER) {
-        advance(p);
-        AST *ast = new_ast(p, AST_DEFER);
-        if (p->cur.type == TOK_PRINT) {
-            ast->defer_stmt.expr = parse_stmt(p);
-        } else {
-            ast->defer_stmt.expr = parse_expr(p);
+if (p->cur.type == TOK_ASSERT) {
+            advance(p);
+            AST *ast = new_ast(p, AST_ASSERT);
+            ast->assert_stmt.expr = parse_expr(p);
+            return ast;
         }
-        return ast;
-    }
-    if (p->cur.type == TOK_GUARD) {
+        if (p->cur.type == TOK_DEFER) {
+            advance(p);
+            AST *ast = new_ast(p, AST_DEFER);
+            if (p->cur.type == TOK_PRINT) {
+                ast->defer_stmt.expr = parse_stmt(p);
+            } else {
+                ast->defer_stmt.expr = parse_expr(p);
+            }
+            return ast;
+        }
+        if (p->cur.type == TOK_GUARD) {
         advance(p);
         AST *ast = new_ast(p, AST_GUARD);
         ast->guard_stmt.cond = parse_expr(p);
@@ -1044,6 +1123,18 @@ static void ast_free_children(AST *ast) {
             break;
         case AST_ONCE:
             ast_free_children(ast->once_stmt.body);
+            break;
+        case AST_CHECK:
+            ast_free_children(ast->check.expr);
+            break;
+        case AST_INVARIANT:
+            free(ast->invariant.var_name);
+            ast_free_children(ast->invariant.body);
+            break;
+        case AST_AROUND:
+            free(ast->aspect.fn_name);
+            free(ast->aspect.aspect_name);
+            ast_free_children(ast->aspect.body);
             break;
         case AST_BREAK:
         case AST_CONTINUE:

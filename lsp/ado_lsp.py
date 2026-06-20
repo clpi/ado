@@ -1125,6 +1125,30 @@ class AdoLSP:
         })
 
         items.append({
+            'label': 'once',
+            'kind': 14,
+            'detail': 'run block once per syntactic block',
+            'insertText': 'once {\n  ${1:body}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'maybe',
+            'kind': 14,
+            'detail': 'probabilistic branch',
+            'insertText': 'maybe ${1:chance} {\n  ${2:body}\n} else {\n  ${3:else_body}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
+            'label': 'for_array',
+            'kind': 14,
+            'detail': 'array iteration',
+            'insertText': 'for ${1:value} in ${2:arr} {\n  ${3:body}\n}',
+            'insertTextFormat': 2
+        })
+
+        items.append({
             'label': 'assert',
             'kind': 14,
             'detail': 'runtime assertion',

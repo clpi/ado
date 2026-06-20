@@ -23,9 +23,9 @@
         aliases: ['do'],
         case_insensitive: false,
         keywords: {
-          keyword: 'fn let if else unless while until for in forever return break continue match enum defer guard assert swap and or not',
+          keyword: 'fn let if else unless while until for in forever return break continue match enum defer guard assert swap try rescue raise once maybe and or not',
           literal: 'true false',
-          built_in: 'print len push abs min max clamp pow sign is_even is_odd gcd lcm factorial fib sum avg contains count_if find all any pop reverse remove insert take drop concat fill filter sort unique reflect capacity reserve shrink_to_fit http_get http_post http_put http_delete http_status getenv exit read_file write_file file_exists sleep time random'
+          built_in: 'print trace len push abs min max clamp pow sign is_even is_odd gcd lcm factorial fib sum avg contains count_if find all any pop reverse remove insert take drop concat fill filter sort unique reflect capacity reserve shrink_to_fit http_get http_post http_put http_delete http_status getenv exit read_file write_file file_exists sleep time random'
         },
         contains: [
           hljs.COMMENT('#', '$'),

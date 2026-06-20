@@ -26,7 +26,7 @@ Open an Ado file with the bundled Neovim launcher:
 ## What Ado provides
 
 - Integer-first values, arrays, booleans, and limited string literals.
-- Block syntax with `fn`, `let`, `if`, `unless`, `while`, `until`, `for`, `forever`, `match`, `guard`, `defer`, `break`, and `continue`.
+- Block syntax with `fn`, `let`, `if`, `unless`, `while`, `until`, `for`, `forever`, `once`, `maybe`, `match`, `guard`, `try`, `rescue`, `defer`, `break`, and `continue`.
 - Array indexing, safe indexing, slicing, dynamic `push`, and `len`.
 - Inline math, array, I/O, HTTP, time, random, and memory helpers.
 - A Python LSP server with completion, diagnostics, navigation, rename, formatting, semantic tokens, inlay hints, code lenses, folding ranges, document highlights, and call hierarchy.

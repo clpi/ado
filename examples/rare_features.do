@@ -42,11 +42,10 @@ fn main() {
   assert handled == 77
 
   let once_seen = 0
-  once {
-    once_seen = 1
-  }
-  once {
-    once_seen = once_seen + 1
+  for i in 0..1 {
+    once {
+      once_seen = once_seen + 1
+    }
   }
   assert once_seen == 1
 

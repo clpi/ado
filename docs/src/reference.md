@@ -136,7 +136,7 @@ let [a, b, ...rest] = values
 
 ## Expressions
 
-Expressions include literals, identifiers, function calls, array operations, arithmetic, comparisons, logical operators, ranges, slices, safe indexing, pipe-forward, expression blocks, list comprehensions, and match expressions.
+Expressions include literals, identifiers, function calls, array operations, arithmetic, comparisons, logical operators, ranges, slices, safe indexing, pipe-forward, expression blocks, list comprehensions, match expressions, and `trace`.
 
 ### Function calls
 
@@ -220,6 +220,8 @@ let scoped = {
 let squares = [for n in 0..5 n * n]
 let evens = [for n in 0..10 where n % 2 == 0 n]
 ```
+
+`trace(value)` prints an integer and returns it, which is useful while composing expressions.
 
 ### Match expressions and guards
 
@@ -369,6 +371,32 @@ forever {
 }
 ```
 
+### `once`
+
+`once { }` runs its block at most once per syntactic block. The guard is emitted as a C `static` local, so repeated loop iterations do not re-run the body.
+
+```ado
+let seen = 0
+for i in 0..3 {
+  once {
+    seen = seen + 1
+  }
+}
+print(seen) # 1
+```
+
+### `maybe`
+
+`maybe chance { } else { }` runs the first block when `ado_random(100) < chance`, otherwise it runs the optional `else` block. `chance` is an integer percentage.
+
+```ado
+maybe 100 {
+  print("always")
+} else {
+  print("never")
+}
+```
+
 ### `for`
 
 `for i in start..end` iterates from `start` to `end - 1`.
@@ -376,6 +404,14 @@ forever {
 ```ado
 for i in 0..5 {
   print(i)
+}
+```
+
+`for name in arr` iterates over integer array elements.
+
+```ado
+for value in [10, 20, 30] {
+  print(value)
 }
 ```
 
@@ -516,6 +552,7 @@ Treat compiler hints as accepted syntax for future tooling unless the compiler i
 | Function | Syntax | Returns | Notes |
 |----------|--------|---------|-------|
 | `print` | `print(a, b, ...)` | `void` | Prints values separated by spaces and a newline. String literals become format text. |
+| `trace` | `trace(value)` | `int` | Prints an integer and returns the same integer. |
 | `len` | `len(arr)` | `int` | Array length. |
 | `push` | `push(arr, value)` | `void` | Appends to an array. |
 

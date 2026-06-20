@@ -43,9 +43,9 @@ mdBook copies it into the generated book output and includes it with the HTML pa
 
 The custom Highlight.js grammar highlights:
 
-- Keywords: `fn`, `let`, `if`, `else`, `unless`, `while`, `until`, `for`, `in`, `forever`, `return`, `break`, `continue`, `match`, `enum`, `defer`, `guard`, `assert`, `swap`, `and`, `or`, `not`.
+- Keywords: `fn`, `let`, `if`, `else`, `unless`, `while`, `until`, `for`, `in`, `forever`, `return`, `break`, `continue`, `match`, `enum`, `defer`, `guard`, `assert`, `swap`, `try`, `rescue`, `raise`, `once`, `maybe`, `and`, `or`, `not`.
 - Literals: `true`, `false`, decimal integers, hexadecimal integers, binary integers, and strings.
-- Built-ins: `print`, `len`, `push`, math helpers, array helpers, I/O helpers, HTTP helpers, and runtime helpers.
+- Built-ins: `print`, `trace`, `len`, `push`, math helpers, array helpers, I/O helpers, HTTP helpers, and runtime helpers.
 - Operators and punctuation: `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `=`, `..`, `...`, `=>`, `|>`, `?`, and `:`.
 - Comments starting with `#`.
 - Function declarations and calls.

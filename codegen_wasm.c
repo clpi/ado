@@ -167,6 +167,16 @@ static void wg_stmt(WasmGen *g, AST *ast) {
             }
             break;
         }
+        case AST_CHECK: {
+            wg_expr(g, ast->check.expr);
+            fprintf(g->out, "\n    call $ado_check\n");
+            break;
+        }
+        case AST_INVARIANT: {
+            wg_expr(g, ast->invariant.body);
+            fprintf(g->out, "\n    call $ado_check\n");
+            break;
+        }
         default: {
             fprintf(g->out, "  ;; unsupported stmt type=%d\n", ast->type);
             break;

@@ -984,6 +984,29 @@ static void gen_stmt(AST *ast, FILE *out, int indent) {
         }
         case AST_ENUM:
             break;
+        case AST_INVARIANT: {
+            gen_indent(out, indent);
+            fprintf(out, "ado_check(");
+            gen_expr(ast->invariant.body, out);
+            fprintf(out, ", \"invariant\");\n");
+            break;
+        }
+        case AST_AROUND: {
+            // Aspect-oriented hooks - currently generates as comments for documentation
+            // Future: could weave code around function calls
+            gen_indent(out, indent);
+            fprintf(out, "/* %s aspect for %s */\n", 
+                ast->aspect.is_around ? "around" : (ast->aspect.is_before ? "before" : "after"),
+                ast->aspect.fn_name ? ast->aspect.fn_name : "unknown");
+            break;
+        }
+        case AST_CHECK: {
+            gen_indent(out, indent);
+            fprintf(out, "ado_check(");
+            gen_expr(ast->check.expr, out);
+            fprintf(out, ", \"check\");\n");
+            break;
+        }
         default:
             gen_indent(out, indent);
             gen_expr(ast, out);
@@ -1064,6 +1087,7 @@ void codegen(AST *ast, FILE *out) {
     fprintf(out, "static int ado_sort(AdoArray a) { if(a.len<2) return 0; if(a.len<32){ado_isort(a.data,0,a.len-1); return 0;} int stk[128],top=0,lo=0,hi=a.len-1;stk[top++]=lo;stk[top++]=hi;while(top>0){hi=stk[--top];lo=stk[--top];int mid=lo+(hi-lo)/2,piv=a.data[mid];a.data[mid]=a.data[hi];a.data[hi]=piv;int i=lo-1;for(int j=lo;j<hi;j++){if(a.data[j]<=a.data[hi]){i++;int t=a.data[i];a.data[i]=a.data[j];a.data[j]=t;}}int t=a.data[i+1];a.data[i+1]=a.data[hi];a.data[hi]=t;int p=i+1;if(p-1>lo){stk[top++]=lo;stk[top++]=p-1;}if(p+1<hi){stk[top++]=p+1;stk[top++]=hi;}} return 0; }\n");
     fprintf(out, "static AdoArray ado_unique(AdoArray a) { if(a.len<=1){AdoArray r=ado_make_array((int[]){},a.len); for(int i=0;i<a.len;i++)r.data[i]=a.data[i]; r.len=a.len; return r;} ado_sort(a); AdoArray r=ado_make_array((int[]){},a.len); r.data[r.len++]=a.data[0]; for(int i=1;i<a.len;i++){if(a.data[i]!=a.data[i-1])r.data[r.len++]=a.data[i];} return r; }\n");
     fprintf(out, "static int ado_reflect(AdoArray a) { printf(\"Array(len=%%d,cap=%%d)\",a.len,a.cap); return 0; }\n");
+    fprintf(out, "static int ado_check(int cond, const char *msg) { if(!cond){fprintf(stderr,\"check failed: %%s\\n\",msg);exit(1);} return 0; }\n");
     
     for (int i = 0; i < ast->block.count; i++) {
         AST *node = ast->block.stmts[i];

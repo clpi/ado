@@ -108,11 +108,11 @@ void repl(void) {
             printf("  Hints: @hint_name fn_name, @memo fn_name (auto-memoization)\n");
             printf("  Enum types: enum Name variant1, variant2 { ... }\n");
             printf("  Match: match expr { pattern => result }\n");
-            printf("  Control: if condition { } else { }, unless condition { } else { }, while condition { }, forever { }\n");
+            printf("  Control: if condition { } else { }, unless condition { } else { }, while condition { }, forever { }, once { }, maybe chance { } else { }\n");
             printf("  Loop controls: break, continue\n");
-            printf("  Safety: assert expr, arr?idx, arr?idx:fallback, try { } rescue err { }\n");
+            printf("  Safety: assert expr, arr?idx, arr?idx:fallback, try { } rescue err { }, trace(value)\n");
             printf("  Destructuring: let [a, b, ...rest] = arr; [a, b] = arr\n");
-            printf("  Expressions: expression blocks { ... }, match as expression, list comprehensions [for x in a..b expr]\n");
+            printf("  Expressions: expression blocks { ... }, match as expression, list comprehensions [for x in a..b expr], for x in arr\n");
             printf("  Swap and I/O: swap a, b; print(expr1, expr2, ...)\n");
             printf("  Operators: + - * / %% == != < > <= >= and or or not\n");
             printf("  Arrays: [1, 2, 3], arr[index]\n");

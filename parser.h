@@ -10,7 +10,9 @@ typedef enum {
     AST_UNARY, AST_TYPE, AST_HINT, AST_MATCH, AST_ENUM, AST_PIPE,
     AST_SLICE, AST_LISTCOMP, AST_DESTRUCT, AST_RANGE, AST_SAFE_INDEX,
     AST_SWAP, AST_ASSERT, AST_FOREVER, AST_BREAK, AST_CONTINUE, AST_DEFER,
-    AST_GUARD, AST_UNTIL, AST_MATCH_ARM, AST_TRY, AST_RAISE, AST_ONCE, AST_MAYBE
+    AST_GUARD, AST_UNTIL, AST_MATCH_ARM, AST_TRY, AST_RAISE, AST_ONCE, AST_MAYBE,
+    AST_INVARIANT, AST_AROUND,
+    AST_CHECK
 } ASTType;
 
 typedef struct {
@@ -62,6 +64,10 @@ typedef struct AST {
         struct { struct AST *body; } once_stmt;
         struct { struct AST *body; struct AST *rescue_body; char *rescue_var; } try_stmt;
         struct { struct AST *expr; } raise_stmt;
+        struct { char *fn_name; struct AST *pre, *post; } spec;
+        struct { char *var_name; struct AST *body; int check_index; } invariant;
+        struct { char *fn_name; char *aspect_name; struct AST *body; int is_around, is_before, is_after; } aspect;
+        struct { struct AST *expr; } check;
     };
 } AST;
 
